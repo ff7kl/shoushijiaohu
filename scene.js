@@ -1,3 +1,4 @@
+import {propMaterial} from './prop-materials.js';
 import {paintedSurface} from './painted-surfaces.js';
 import {collisionBoxes, safeLamp, nearestLamp} from './lamp-collision.js';
 import {curls,solveIK,clamp,normalizeCurl,limbPose,handPosition,pinchState} from './puppet-control.js';
@@ -11,12 +12,13 @@ const camera=new THREE.PerspectiveCamera(38,1,.1,70);const home=new THREE.Vector
 const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,2,0);controls.enableDamping=true;controls.minDistance=4;controls.maxDistance=24;controls.minPolarAngle=.45;controls.maxPolarAngle=1.46;controls.minAzimuthAngle=-.7;controls.maxAzimuthAngle=.85;controls.enablePan=false;
 const room=new THREE.Group(),props=new THREE.Group(),puppet=new THREE.Group(),lamp=new THREE.Group();scene.add(room,props,puppet,lamp);room.name='room';props.name='props';puppet.name='puppet';lamp.name='lamp';
 let seed=43;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
-function texture(base,kind){const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,512,512);for(let i=0;i<16000;i++){x.fillStyle=rand()>.5?'rgba(220,210,175,.035)':'rgba(0,0,0,.055)';x.fillRect(rand()*512,rand()*512,rand()*7+1,rand()*3+1);}if(kind==='wall'){for(let i=0;i<80;i++){x.fillStyle='rgba(25,37,28,.06)';x.fillRect(rand()*512,0,rand()*18,rand()*512);}x.strokeStyle='#343e34';x.lineWidth=.7;for(let i=0;i<9;i++){let a=rand()*512,b=rand()*512;x.beginPath();x.moveTo(a,b);for(let j=0;j<8;j++){a+=rand()*24-12;b+=rand()*19;x.lineTo(a,b);}x.stroke();}}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
-// Preserve the original procedural prop layout random sequence.
-for(let i=0;i<160402;i++)rand();
-const wood=new THREE.MeshStandardMaterial({map:texture('#514331','wood'),roughness:.87});
-const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.8});const iron=mat('#292e28'),paper=mat('#aaa58d'),skin=mat('#aa8554'),dark=mat('#252c2b');
-function box(w,h,d,m,x,y,z,parent=props){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;parent.add(o);return o;}
+// Keep the procedural layout sequence independent of the replacement artwork.
+for(let i=0;i<240402;i++)rand();
+const wood=propMaterial('wood','#756047'),woodVariants=['#786248','#6b5b45','#827058'].map((color,i)=>propMaterial('wood',color,31+i));
+let woodIndex=0;
+const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.8});
+const iron=mat('#292e28'),paper=propMaterial('paper','#bcb59a'),skin=propMaterial('skin','#bd9c6e'),dark=propMaterial('cloth','#465453');
+function box(w,h,d,m,x,y,z,parent=props){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m===wood?woodVariants[woodIndex++%woodVariants.length]:m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;parent.add(o);return o;}
 function ball(r,m,x,y,z,parent=puppet){const o=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
 function rod(a,b,r,m,parent=props){const delta=new THREE.Vector3().subVectors(b,a);const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,delta.length(),12),m);o.position.copy(a).add(b).multiplyScalar(.5);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());o.castShadow=true;parent.add(o);return o;}
 const v=(x,y,z)=>new THREE.Vector3(x,y,z);
@@ -38,7 +40,8 @@ box(7.6,2.65,.16,wood,0,3.1,-3.58);box(7.3,2.4,.04,boardPaint,0,3.1,-3.47);box(7
 const glow=new THREE.MeshStandardMaterial({color:'#718f8e',emissive:'#4d717b',emissiveIntensity:.6});box(.03,2.7,2.5,glow,-4.86,3.5,-.6);for(let z=-1.85;z<=.66;z+=.83)box(.12,2.85,.06,wood,-4.77,3.5,z);box(.12,.07,2.65,wood,-4.76,3.5,-.6);
 function desk(x,z,angle=0){const g=new THREE.Group();props.add(g);box(1.65,.13,1.05,wood,0,1.55,0,g);for(const a of [-.68,.68])for(const b of [-.4,.4])box(.09,1.5,.09,iron,a,.75,b,g);box(1.3,.16,.65,wood,0,.7,1,g);for(const a of [-.52,.52])box(.08,.7,.08,iron,a,.35,1,g);box(1.3,.6,.09,wood,0,1.15,1.3,g);g.position.set(x,0,z);g.rotation.y=angle;return g;}
 desk(3,-1.2,-.12);desk(-3.2,-1.7,.15);
-const covers=['#5f433a','#394f48','#686149','#3c4856'];function book(x,y,z,w=1){const g=new THREE.Group();props.add(g);box(w,.13,.58,paper,0,0,0,g);for(const h of [-.085,.085])box(w+.05,.035,.62,mat(covers[Math.floor(rand()*4)]),0,h,0,g);g.position.set(x,y,z);g.rotation.y=(rand()-.5)*.3;return g;}
+const covers=['#785a4b','#4e6960','#8b8055','#536a7b'];
+const coverPaint=covers.map((color,i)=>propMaterial('cover',color,91+i));function book(x,y,z,w=1){const g=new THREE.Group();props.add(g);box(w,.13,.58,paper,0,0,0,g);for(const h of [-.085,.085])box(w+.05,.035,.62,coverPaint[Math.floor(rand()*4)],0,h,0,g);g.position.set(x,y,z);g.rotation.y=(rand()-.5)*.3;return g;}
 for(let i=0;i<15;i++)book(3+Math.sin(i*.7)*.16,1.76+i*.19,-1.15,1+rand()*.25);for(let i=0;i<5;i++)book(4,.2+i*.19,1.2,.8);book(-2.9,1.75,-1.7);book(1.9,.18,1.8);
 // A handmade jointed puppet, ready to be driven by hand tracking later.
 puppet.position.set(-.65,0,.65);box(.65,.85,.35,dark,0,1.35,0,puppet);ball(.42,skin,0,2.15,0);ball(.43,dark,0,2.28,-.07);box(.62,.2,.15,dark,0,2.4,.25,puppet);for(const x of [-.16,.16]){ball(.07,iron,x,2.16,.38);ball(.018,mat('#d7c88a'),x,2.17,.44);}rod(v(0,1.7,0),v(0,1.85,0),.09,skin,puppet);
@@ -52,7 +55,7 @@ for(const side of [1,-1])for(const leg of [false,true]){
 }
 function segment(mesh,a,b){mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.scale.y=a.distanceTo(b)/mesh.geometry.parameters.height;mesh.quaternion.setFromUnitVectors(v(0,1,0),b.clone().sub(a).normalize());}
 // Pendant light: visible bulb and a real shadow-casting spotlight.
-lamp.position.set(1.3,4.6,.3);const shade=new THREE.Mesh(new THREE.ConeGeometry(.6,.35,32,1,true),new THREE.MeshStandardMaterial({color:'#53614a',side:THREE.DoubleSide,roughness:.7}));lamp.add(shade);const bulb=ball(.12,new THREE.MeshStandardMaterial({color:'#fff0bb',emissive:'#ffd17a',emissiveIntensity:4}),0,-.15,0,lamp);const light=new THREE.SpotLight('#ffce86',65,15,.64,.65,1.5);light.position.set(0,-.23,0);lamp.add(light);light.target.position.set(1.1,0,.2);scene.add(light.target);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.0005;
+lamp.position.set(1.3,4.6,.3);const shade=new THREE.Mesh(new THREE.ConeGeometry(.6,.35,32,1,true),Object.assign(propMaterial('enamel','#61745a'),{side:THREE.DoubleSide}));lamp.add(shade);const bulb=ball(.12,new THREE.MeshStandardMaterial({color:'#fff0bb',emissive:'#ffd17a',emissiveIntensity:4}),0,-.15,0,lamp);const light=new THREE.SpotLight('#ffce86',65,15,.64,.65,1.5);light.position.set(0,-.23,0);lamp.add(light);light.target.position.set(1.1,0,.2);scene.add(light.target);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.0005;
 scene.add(new THREE.HemisphereLight('#89a2af','#2b251a',1.35));const moon=new THREE.DirectionalLight('#9bbdcf',2.2);moon.position.set(-6,7,1);scene.add(moon);const fill=new THREE.DirectionalLight('#c2b492',.6);fill.position.set(3,4,8);scene.add(fill);
 const dustPositions=[];for(let i=0;i<180;i++)dustPositions.push((rand()-.5)*9,rand()*5,(rand()-.5)*6);const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.Float32BufferAttribute(dustPositions,3));scene.add(new THREE.Points(dg,new THREE.PointsMaterial({color:'#c5bd98',size:.018,transparent:true,opacity:.35})));
 let view='close';
