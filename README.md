@@ -75,3 +75,11 @@
 ## 学生木偶角色几何首版
 
 角色几何首版已完成，新增 student-character.js 并接入场景，碰撞包围盒支持嵌套角色部件。三视角、动作画面、嵌套碰撞及性能尚未完成浏览器验收；暂不进入材质细化。
+
+## 角色首版验收（2026-11-01）
+- 本地预览：`npm run dev -- --port 5175 --strictPort`，打开 http://127.0.0.1:5175/shoushijiaohu/ 。旧 server.mjs 的 5173 静态服务无法解析源码裸模块导入，不用于本轮验收。
+- 自动检查：npm run check、npm run build 通过。
+- 浏览器检查：PREVIEW_URL 指向上述地址；verify-poses.mjs 的 15 个单指姿势及骨长通过；verify-art.mjs 灯光/视图截图完成；verify-collision.mjs 重跑 461 帧无穿透；verify-lamp.mjs 合成状态通过。verify-student.mjs 记录组合姿势和退出模拟。
+- 视觉修复：收回下巴叠层和眼部体积。截图在 screenshots/student-*.png。侧视截图受现有 OrbitControls 方位限制，实际仍是偏侧三分之四，严格侧面尚待补验。
+- 性能：1440×1000 当前角色 90 Mesh、24600 三角形；采样全场景 344 draw calls、33632 三角形（包含渲染器当帧统计）。没有可靠同条件基线及帧耗时对照，不声明性能变化。
+- 真人待验收：真实摄像头五指映射、校准、失追恢复；合成滑杆与状态事件不能代替真人验收。造型仍是几何首版，与参考图的自然发束和绘本表现存在差距，本轮未进入材质细化。

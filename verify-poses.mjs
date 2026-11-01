@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,channel:'chrome'});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
-await page.goto('http://127.0.0.1:5173');
+await page.goto((process.env.PREVIEW_URL||'http://127.0.0.1:5174/shoushijiaohu/'));
 await page.waitForFunction(()=>!!window.theatre);
 await page.locator('details').last().locator('summary').click();
 await page.locator('#simulate').check();

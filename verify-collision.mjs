@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const browser=await chromium.launch({headless:true,channel:'chrome'});
 try{
 const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:5173');await page.waitForFunction(()=>window.theatre);
+await page.goto((process.env.PREVIEW_URL||'http://127.0.0.1:5174/shoushijiaohu/'));await page.waitForFunction(()=>window.theatre);
 await page.waitForFunction(()=>window.theatre);
 await page.evaluate(async()=>{
  const {collisionBoxes,safeLamp}=await import('./lamp-collision.js');window.failures=[];window.samples=0;
