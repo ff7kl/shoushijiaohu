@@ -1,3 +1,4 @@
+import {paintedSurface} from './painted-surfaces.js';
 import {collisionBoxes, safeLamp, nearestLamp} from './lamp-collision.js';
 import {curls,solveIK,clamp,normalizeCurl,limbPose,handPosition,pinchState} from './puppet-control.js';
 import * as THREE from 'three';
@@ -11,18 +12,28 @@ const controls=new OrbitControls(camera,renderer.domElement);controls.target.set
 const room=new THREE.Group(),props=new THREE.Group(),puppet=new THREE.Group(),lamp=new THREE.Group();scene.add(room,props,puppet,lamp);room.name='room';props.name='props';puppet.name='puppet';lamp.name='lamp';
 let seed=43;function rand(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
 function texture(base,kind){const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,512,512);for(let i=0;i<16000;i++){x.fillStyle=rand()>.5?'rgba(220,210,175,.035)':'rgba(0,0,0,.055)';x.fillRect(rand()*512,rand()*512,rand()*7+1,rand()*3+1);}if(kind==='wall'){for(let i=0;i<80;i++){x.fillStyle='rgba(25,37,28,.06)';x.fillRect(rand()*512,0,rand()*18,rand()*512);}x.strokeStyle='#343e34';x.lineWidth=.7;for(let i=0;i<9;i++){let a=rand()*512,b=rand()*512;x.beginPath();x.moveTo(a,b);for(let j=0;j<8;j++){a+=rand()*24-12;b+=rand()*19;x.lineTo(a,b);}x.stroke();}}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
-const wall=new THREE.MeshStandardMaterial({map:texture('#777e6c','wall'),roughness:1}),floor=new THREE.MeshStandardMaterial({map:texture('#45595a','floor'),roughness:.92}),wood=new THREE.MeshStandardMaterial({map:texture('#514331','wood'),roughness:.87});
+// Preserve the original procedural prop layout random sequence.
+for(let i=0;i<160402;i++)rand();
+const wood=new THREE.MeshStandardMaterial({map:texture('#514331','wood'),roughness:.87});
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.8});const iron=mat('#292e28'),paper=mat('#aaa58d'),skin=mat('#aa8554'),dark=mat('#252c2b');
 function box(w,h,d,m,x,y,z,parent=props){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;parent.add(o);return o;}
 function ball(r,m,x,y,z,parent=puppet){const o=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
 function rod(a,b,r,m,parent=props){const delta=new THREE.Vector3().subVectors(b,a);const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,delta.length(),12),m);o.position.copy(a).add(b).multiplyScalar(.5);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());o.castShadow=true;parent.add(o);return o;}
 const v=(x,y,z)=>new THREE.Vector3(x,y,z);
-box(10,.38,7.6,wood,0,-.24,0,room);box(9.7,.12,7.3,floor,0,0,0,room);box(10,5.5,.22,wall,0,2.7,-3.8,room);box(.22,5.5,7.6,wall,-5,2.7,0,room);box(.22,2,7.6,wall,5,.95,0,room);
+// BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z.
+const edge=new THREE.MeshStandardMaterial({color:'#78827b',roughness:1});
+const backPaint=paintedSurface('wall',10,5.5,71),leftPaint=paintedSurface('wall',7.6,5.5,83),rightPaint=paintedSurface('wall',7.6,2,97);
+box(10,.38,7.6,wood,0,-.24,0,room);
+box(9.7,.12,7.3,[edge,edge,paintedSurface('floor',9.7,7.3,33),edge,edge,edge],0,0,0,room);
+box(10,5.5,.22,[edge,edge,edge,edge,backPaint,edge],0,2.7,-3.8,room);
+box(.22,5.5,7.6,[leftPaint,edge,edge,edge,edge,edge],-5,2.7,0,room);
+box(.22,2,7.6,[edge,rightPaint,edge,edge,edge,edge],5,.95,0,room);
 for(let i=0;i<9;i++)box(.018,.006,7.2,iron,-4.4+i*1.1,.065,0,room);
 box(9.8,.18,.18,wood,0,.35,-3.61,room);box(.18,.18,7.4,wood,-4.8,.35,0,room);
-// The faded board is generated locally, including chalk smears and an unfinished lesson.
-const bc=document.createElement('canvas');bc.width=1024;bc.height=512;const bx=bc.getContext('2d');bx.fillStyle='#162e26';bx.fillRect(0,0,1024,512);for(let i=0;i<1800;i++){bx.fillStyle='rgba(190,199,160,.018)';bx.fillRect(rand()*1024,rand()*512,rand()*160,rand()*15);}bx.fillStyle='#aeb59a';bx.font='28px serif';bx.fillText('十一月一日     星期日',65,60);bx.font='42px serif';bx.fillText('请 回 到 你 的 座 位',225,200);bx.globalAlpha=.42;bx.font='23px serif';bx.fillText('值日生：________________',600,455);bx.strokeStyle='#a9b39a';bx.lineWidth=2;bx.beginPath();bx.moveTo(60,410);bx.lineTo(60,325);bx.lineTo(120,275);bx.lineTo(180,325);bx.lineTo(180,410);bx.closePath();bx.stroke();for(let i=0;i<50;i++){bx.beginPath();let a=rand()*1024;bx.moveTo(a,420);bx.lineTo(a+rand()*24-12,395-rand()*24);bx.stroke();}const bt=new THREE.CanvasTexture(bc);bt.colorSpace=THREE.SRGBColorSpace;
-box(7.6,2.65,.16,wood,0,3.1,-3.58);box(7.3,2.4,.04,new THREE.MeshStandardMaterial({map:bt,roughness:1}),0,3.1,-3.47);box(7.7,.1,.35,wood,0,1.75,-3.35);
+const boardPaint=paintedSurface('board',7.3,2.4,29);
+// Preserve random draws formerly used by chalk marks before creating books.
+for(let i=0;i<7350;i++)rand();
+box(7.6,2.65,.16,wood,0,3.1,-3.58);box(7.3,2.4,.04,boardPaint,0,3.1,-3.47);box(7.7,.1,.35,wood,0,1.75,-3.35);
 // A cold window, its frame and bars.
 const glow=new THREE.MeshStandardMaterial({color:'#718f8e',emissive:'#4d717b',emissiveIntensity:.6});box(.03,2.7,2.5,glow,-4.86,3.5,-.6);for(let z=-1.85;z<=.66;z+=.83)box(.12,2.85,.06,wood,-4.77,3.5,z);box(.12,.07,2.65,wood,-4.76,3.5,-.6);
 function desk(x,z,angle=0){const g=new THREE.Group();props.add(g);box(1.65,.13,1.05,wood,0,1.55,0,g);for(const a of [-.68,.68])for(const b of [-.4,.4])box(.09,1.5,.09,iron,a,.75,b,g);box(1.3,.16,.65,wood,0,.7,1,g);for(const a of [-.52,.52])box(.08,.7,.08,iron,a,.35,1,g);box(1.3,.6,.09,wood,0,1.15,1.3,g);g.position.set(x,0,z);g.rotation.y=angle;return g;}
