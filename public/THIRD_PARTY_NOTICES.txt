@@ -1,0 +1,21 @@
+# Third-party notices and artwork sources
+
+Runtime libraries:
+- Three.js 0.187.0, Copyright © 2010-2026 three.js authors, MIT. https://github.com/mrdoob/three.js ; full license: licenses/three-MIT.txt.
+- @mediapipe/tasks-vision 1.2.0 (including copied WASM and loader scripts), Google LLC / MediaPipe contributors, Apache-2.0. https://github.com/google-ai-edge/mediapipe ; full license: licenses/mediapipe-Apache-2.0.txt. Original copyright headers in WASM loader scripts are retained.
+
+Model:
+- public/models/hand_landmarker.task is the existing Google MediaPipe Hand Landmarker full float16 bundle (7,819,105 bytes). Recorded local SHA256: fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1.
+- Official distribution: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+- Guide: https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker
+- Official model card states Apache License 2.0: https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Hand%20Tracking%20(Lite_Full)%20with%20Fairness%20Oct%202021.pdf
+- Original download receipt is absent from the inherited project. During release preparation the official float16/1 bundle was fetched and its SHA256 matched the existing local file exactly; the model was not replaced.
+
+Artwork:
+- painted-surfaces.js and prop-materials.js are original project-local Canvas artwork, CC0-1.0 as recorded in README. No external raster textures, paid assets, web fonts, or downloaded reference imagery are shipped. Text uses the device's installed serif fonts.
+- Existing procedural geometry is project source. No new blanket license is assigned to application source or inherited geometry.
+
+Build tools (not required by deployed site):
+- Vite 8.3.5, MIT, https://github.com/vitejs/vite. Its LICENSE.md includes bundled third-party notices. Dependency versions and integrity hashes are locked in package-lock.json; transitive build-tool licenses remain in their npm distributions.
+
+Only static resource downloads occur at runtime. Camera frames and inference remain in the browser; no external inference endpoint or analytics is configured.

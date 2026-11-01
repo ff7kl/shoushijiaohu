@@ -1,2 +1,26 @@
-{"name":"shoushijiaohu","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node server.mjs","check":"node --check hand-tracking.js && node --check scene.js && node --check server.mjs && node --check puppet-control.js && node check-control.mjs && node check-collision.mjs"},"dependencies":{"@mediapipe/tasks-vision":"1.2.0","three":"0.187.0"}}
-
+{
+  "name": "shoushijiaohu",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "check": "node --check hand-tracking.js && node --check scene.js && node --check server.mjs && node --check puppet-control.js && node check-control.mjs && node check-collision.mjs && node --check vite.config.js && node --check scripts/prepare-assets.mjs",
+    "dev": "vite",
+    "predev": "node scripts/prepare-assets.mjs",
+    "prebuild": "node scripts/prepare-assets.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prestart": "node scripts/prepare-assets.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.0",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -1,4 +1,4 @@
-import {FilesetResolver, HandLandmarker} from '/node_modules/@mediapipe/tasks-vision/vision_bundle.mjs';
+import {FilesetResolver, HandLandmarker} from '@mediapipe/tasks-vision';
 
 const video = document.querySelector('#camera-video');
 const canvas = document.querySelector('#hand-overlay');
@@ -80,9 +80,9 @@ startButton.onclick=async()=>{
   status.textContent='模型加载中';
   try {
     if(!model) {
-      const files=await FilesetResolver.forVisionTasks('/node_modules/@mediapipe/tasks-vision/wasm');
+      const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
       model=await HandLandmarker.createFromOptions(files,{
-        baseOptions:{modelAssetPath:'/public/models/hand_landmarker.task'},
+        baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},
         runningMode:'VIDEO',numHands:2
       });
     }
@@ -99,7 +99,7 @@ startButton.onclick=async()=>{
   } catch(error) {
     if(token!==generation) return;
     const messages={NotAllowedError:'权限被拒绝，请在浏览器中允许摄像头后重试。',NotFoundError:'没有找到摄像头，请连接设备后重试。',NotReadableError:'摄像头无法读取，可能被其他应用占用，请关闭占用程序后重试。'};
-    stop('摄像头错误：'+(messages[error.name]||error.message));
+    stop('摄像头或模型加载失败：'+(messages[error.name]||error.message)+' 点击“开启摄像头”重试。');
   }
 };
 stopButton.onclick=()=>stop();

@@ -39,3 +39,7 @@
 仅替换材质，未改动任何几何尺寸、IK、碰撞、手势控制与相机代码。保留原程序布局的随机序列，灯泡发光与真实灯光开关联动未变。
 
 验证：`npm run check` 通过；`verify-transitions.mjs` 灯高模拟、模式切换和光照开关检查通过；`verify-poses.mjs` 的 15 个独立模拟姿势及渲染关节检查通过，已查看近景抬手截图；`verify-collision.mjs` 458 帧无包围体重叠。前后截图为 `screenshots/material-{before,after}-{close,wide}.png`，属于不提交的本地验收产物。真人摄像头操作未重新验证。
+
+## 静态生产版本
+
+项目现使用 Vite。执行 `npm ci`、`npm run dev` 开发；`npm run check` 检查；`npm run build` 构建；`npm run preview` 预览。旧 `server.mjs` 仅作为历史本地工具保留，不参与生产构建。部署配置、子路径测试、资源与许可说明见 [DEPLOYMENT.md](DEPLOYMENT.md) 和 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)。Pages 工作流仅手动触发，本轮不发布。
