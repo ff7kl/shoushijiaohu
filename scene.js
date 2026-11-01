@@ -1,3 +1,4 @@
+import './mobile-layout.js';
 import {propMaterial} from './prop-materials.js';
 import {paintedSurface} from './painted-surfaces.js';
 import {collisionBoxes, safeLamp, nearestLamp} from './lamp-collision.js';

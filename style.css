@@ -4,3 +4,24 @@ header,footer{flex-shrink:0}#stage{min-height:360px;flex:1 0 360px}.camera-panel
 /* Stage and tools share the available viewport height. */
 header{height:64px;padding:8px 24px}.mark{font-size:28px}h1{font-size:22px}header p{margin-top:3px}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 320px;flex:1;min-height:0}#stage{min-height:0;min-width:0;height:100%}aside{min-height:0;overflow:auto;border-left:1px solid #303931;padding:16px;background:#151c19}.camera-panel{display:block;padding:0;border:0}.camera-preview{width:100%;margin-bottom:14px}.camera-controls{max-width:none;line-height:1.6}.camera-controls button{margin:0 4px 0 0;padding:9px}.calibration{margin:18px 0;font-size:12px}.calibration button{margin:0}details{font-size:12px;line-height:1.7;border-top:1px solid #303931;padding-top:12px}summary{cursor:pointer}#mapping-debug{overflow-wrap:anywhere}.camera-note{position:static;font-size:12px;line-height:1.9;margin-top:20px;color:#aeb6a5}.caption{left:24px;bottom:16px}.caption p{margin:8px 0;font-size:16px}footer{min-height:54px;padding:8px 24px}footer p{margin:0;font-size:11px}footer button{padding:8px 10px;margin-left:4px}button[aria-pressed=true]{background:#303b30;border-color:#a59a73}
 @media(max-width:900px){body{height:auto;min-height:100%}.workspace{display:flex;flex-direction:column;flex:none}#stage{height: max(400px,65svh);flex:none}aside{border-left:0;border-top:1px solid #303931;overflow:visible}.camera-preview{max-width:320px}.camera-panel{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:16px}.camera-controls{flex:1;min-width:240px}footer{flex-wrap:wrap}footer>div{display:flex;flex-wrap:wrap;gap:6px}footer button{margin:0}header{padding:8px 16px}.caption{left:16px}.phase{display:none}}
+
+/* Keep a compact camera above the larger theatre within the initial mobile viewport. */
+@media(max-width:900px){
+ header{height:52px;padding:6px 12px}
+ header h1{font-size:20px}
+ header p{font-size:10px;letter-spacing:1px}
+ .identity{gap:12px}
+ .workspace>.camera-panel{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;padding:8px 12px;min-height:112px;border-bottom:1px solid #303931;background:#151c19}
+ .workspace>.camera-panel .camera-preview{width:112px;max-width:none;margin:0;aspect-ratio:4/3}
+ .workspace>.camera-panel .camera-controls{width:auto;min-width:0;font-size:11px;line-height:1.4}
+ .workspace>.camera-panel .camera-controls button{min-height:40px;padding:7px 8px;font-size:11px;margin-right:3px;touch-action:manipulation}
+ .workspace>.camera-panel .camera-controls p{margin:4px 0}
+ .workspace>.camera-panel #mapping-debug,.workspace>.camera-panel .camera-controls small{display:none}
+ #stage{height:calc(100svh - 164px);min-height:280px;flex:none}
+ .caption{bottom:8px;left:12px}
+ .caption p{font-size:13px;margin:4px 0}
+ .workspace>footer{padding:8px 12px;gap:8px;align-items:flex-start}
+ .workspace>footer>div{gap:6px}
+ .workspace>footer button{min-height:40px;touch-action:manipulation}
+ aside{padding:12px}
+}
