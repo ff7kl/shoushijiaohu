@@ -1,9 +1,12 @@
-name: Deploy static classroom to Pages (manual only)
+name: Deploy static classroom to Pages
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       base:
         description: '部署路径，如 /实际仓库名/；用户站点或自定义域名填 /'
+        default: /shoushijiaohu/
         required: true
         type: string
 permissions:
@@ -26,7 +29,7 @@ jobs:
       - run: npm run check
       - run: npm run build
         env:
-          DEPLOY_BASE: ${{ inputs.base }}
+          DEPLOY_BASE: ${{ inputs.base || '/shoushijiaohu/' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,5 +1,5 @@
-import {chromium} from 'file:///C:/Users/natural/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
-const browser=await chromium.launch({headless:true,executablePath:"C:/Program Files/Google/Chrome/Application/chrome.exe"});
+import {chromium} from 'playwright';
+const browser=await chromium.launch({headless:true,channel:'chrome'});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 await page.goto('http://127.0.0.1:5173');
 await page.waitForFunction(()=>!!window.theatre);

@@ -43,3 +43,13 @@
 ## 静态生产版本
 
 项目现使用 Vite。执行 `npm ci`、`npm run dev` 开发；`npm run check` 检查；`npm run build` 构建；`npm run preview` 预览。旧 `server.mjs` 仅作为历史本地工具保留，不参与生产构建。部署配置、子路径测试、资源与许可说明见 [DEPLOYMENT.md](DEPLOYMENT.md) 和 [THIRD_PARTY_NOTICES](public/THIRD_PARTY_NOTICES.txt)。Pages 工作流仅手动触发，本轮不发布。
+
+## GitHub Pages 正式部署
+
+站点入口：https://ff7kl.github.io/shoushijiaohu/ 。源码仓库：https://github.com/ff7kl/shoushijiaohu 。仓库与 Git 历史公开，站点的 JS、模型及 Canvas 美术代码也可被任何访客下载；摄像头帧仅在浏览器处理，不上传。
+
+默认基础路径已设置为 `/shoushijiaohu/`。更新：本地运行 `npm ci`、`npm run check`、`npm run build`，提交后推送 `main`；Pages Actions 自动构建部署。也可手动运行工作流。首次发布状态以 Actions 和实际站点验收为准。
+
+回退：对出问题的提交执行 `git revert <提交编号>`，检查通过后推送 main 触发重新部署；或在 Actions 中对最后成功的工作流运行选择 Re-run all jobs。不要强推删除历史。若需要立即下线，可在 Settings → Pages 中取消发布。
+
+已知限制：摄像头需 HTTPS 与用户允许；真人双手身份、校准、遮挡恢复与不同设备体验仍需真人验收，合成输入不能替代。JS 主包体积提示仍存在；首次模型与 WASM 下载较大。木偶碰撞使用保守包围体，不等于完整物理模拟。
