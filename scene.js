@@ -1,3 +1,4 @@
+import {createStudent} from './student-character.js';
 import './mobile-layout.js';
 import {propMaterial} from './prop-materials.js';
 import {paintedSurface} from './painted-surfaces.js';
@@ -45,7 +46,7 @@ const covers=['#785a4b','#4e6960','#8b8055','#536a7b'];
 const coverPaint=covers.map((color,i)=>propMaterial('cover',color,91+i));function book(x,y,z,w=1){const g=new THREE.Group();props.add(g);box(w,.13,.58,paper,0,0,0,g);for(const h of [-.085,.085])box(w+.05,.035,.62,coverPaint[Math.floor(rand()*4)],0,h,0,g);g.position.set(x,y,z);g.rotation.y=(rand()-.5)*.3;return g;}
 for(let i=0;i<15;i++)book(3+Math.sin(i*.7)*.16,1.76+i*.19,-1.15,1+rand()*.25);for(let i=0;i<5;i++)book(4,.2+i*.19,1.2,.8);book(-2.9,1.75,-1.7);book(1.9,.18,1.8);
 // A handmade jointed puppet, ready to be driven by hand tracking later.
-puppet.position.set(-.65,0,.65);box(.65,.85,.35,dark,0,1.35,0,puppet);ball(.42,skin,0,2.15,0);ball(.43,dark,0,2.28,-.07);box(.62,.2,.15,dark,0,2.4,.25,puppet);for(const x of [-.16,.16]){ball(.07,iron,x,2.16,.38);ball(.018,mat('#d7c88a'),x,2.17,.44);}rod(v(0,1.7,0),v(0,1.85,0),.09,skin,puppet);
+puppet.position.set(-.65,0,.65);
 const limbs=[];
 for(const side of [1,-1])for(const leg of [false,true]){
  const root=v(side*(leg?.19:.43),leg?.95:1.65,0),end=v(side*(leg?.29:.75),leg?.17:.85,.12);
@@ -54,6 +55,7 @@ for(const side of [1,-1])for(const leg of [false,true]){
  const joint=ball(.10,skin,0,0,0),tip=leg?box(.23,.14,.43,wood,0,0,0,puppet):ball(.10,skin,0,0,0);
  limbs.push({root,end,rest:end.clone(),a,b,upper,lower,joint,tip,leg,side,index:leg?(side===1?3:4):(side===1?0:1)});
 }
+const student=createStudent(puppet,limbs);
 function segment(mesh,a,b){mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.scale.y=a.distanceTo(b)/mesh.geometry.parameters.height;mesh.quaternion.setFromUnitVectors(v(0,1,0),b.clone().sub(a).normalize());}
 // Pendant light: visible bulb and a real shadow-casting spotlight.
 lamp.position.set(1.3,4.6,.3);const shade=new THREE.Mesh(new THREE.ConeGeometry(.6,.35,32,1,true),Object.assign(propMaterial('enamel','#61745a'),{side:THREE.DoubleSide}));lamp.add(shade);const bulb=ball(.12,new THREE.MeshStandardMaterial({color:'#fff0bb',emissive:'#ffd17a',emissiveIntensity:4}),0,-.15,0,lamp);const light=new THREE.SpotLight('#ffce86',65,15,.64,.65,1.5);light.position.set(0,-.23,0);lamp.add(light);light.target.position.set(1.1,0,.2);scene.add(light.target);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.0005;
@@ -157,7 +159,7 @@ function applyPose(){
  for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
 
  // Move the rigid torso and head together with the middle-finger lift.
- for(const child of puppet.children){if(!limbs.some(l=>[l.upper,l.lower,l.joint,l.tip].includes(child))){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}}
+ for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}
 }
 const books=[new THREE.Box3(v(2.1-.63,-1,-1.65-.63),v(3.9+.63,4.9,-.65+.63))];
 function currentBoxes(){return [...collisionBoxes(puppet),...books];}

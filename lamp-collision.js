@@ -3,7 +3,7 @@ import {Box3, Vector3} from 'three';
 const extent=new Vector3(.63,.30,.63);
 export function collisionBoxes(puppet){
  puppet.updateWorldMatrix(true,true);
- return puppet.children.filter(o=>o.isMesh).map(o=>new Box3().setFromObject(o).expandByVector(extent));
+ return puppet.children.map(o=>new Box3().setFromObject(o).expandByVector(extent));
 }
 export function safeLamp(p,boxes){return [...p].every(Number.isFinite)&&p.x>=-1.5&&p.x<=1.5&&p.y>=1&&p.y<=5.4&&!boxes.some(b=>p.x>b.min.x&&p.x<b.max.x&&p.y>b.min.y&&p.y<b.max.y&&p.z>b.min.z&&p.z<b.max.z);}
 // Exact nearest point outside a finite union of axis-aligned rectangles at fixed Z.
