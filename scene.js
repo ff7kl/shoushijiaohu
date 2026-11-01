@@ -158,6 +158,7 @@ function applyPose(){
  const lift=driver.values[2]*.55;
  for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
 
+ student.update?.();
  // Move the rigid torso and head together with the middle-finger lift.
  for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}
 }
