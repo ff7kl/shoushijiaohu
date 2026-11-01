@@ -1,3 +1,4 @@
+import {collisionBoxes, safeLamp, nearestLamp} from './lamp-collision.js';
 import {curls,solveIK,clamp,normalizeCurl,limbPose,handPosition,pinchState} from './puppet-control.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -136,30 +137,52 @@ window.addEventListener('handtracking',({detail})=>{
  }
 
 });
+function applyPose(){
+ const lift=driver.values[2]*.55;
+ for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
+
+ // Move the rigid torso and head together with the middle-finger lift.
+ for(const child of puppet.children){if(!limbs.some(l=>[l.upper,l.lower,l.joint,l.tip].includes(child))){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}}
+}
+const books=[new THREE.Box3(v(2.1-.63,-1,-1.65-.63),v(3.9+.63,4.9,-.65+.63))];
+function currentBoxes(){return [...collisionBoxes(puppet),...books];}
+function resolveCollision(next,dt,previousPosition,previousValues){
+ const proposed=puppet.position.clone(),values=driver.values.slice(),origin=lamp.position.clone();
+ // A pre-existing overlap is repaired once; ordinary frames obey the speed budget.
+ puppet.position.copy(previousPosition);driver.values.splice(0,5,...previousValues);applyPose();
+ const recovering=!safeLamp(origin,currentBoxes());
+ const budget=Math.max(.001,dt*3);
+ if(next.distanceTo(origin)>budget){const delta=next.clone().sub(origin).setLength(budget);next.copy(origin).add(delta);}
+ let accepted=null;
+ for(let step=0;step<=12;step++){
+  const fraction=step===12?0:Math.pow(.5,step);
+  puppet.position.copy(previousPosition).lerp(proposed,fraction);
+  driver.values.splice(0,5,...values.map((value,i)=>previousValues[i]+(value-previousValues[i])*fraction));applyPose();
+  const boxes=currentBoxes(),candidate=nearestLamp(next,boxes);
+  if(candidate&&(recovering||candidate.distanceTo(origin)<=budget)) {accepted=candidate;break;}
+ }
+ if(!accepted){
+  puppet.position.copy(previousPosition);driver.values.splice(0,5,...previousValues);applyPose();
+  const boxes=currentBoxes();accepted=safeLamp(origin,boxes)?origin:nearestLamp(origin,boxes);
+ }
+ if(accepted)lamp.position.copy(accepted);
+}
 let lastFrame=performance.now();
 renderer.setAnimationLoop(()=>{
  const now=performance.now(),dt=Math.min((now-lastFrame)/1000,.1);lastFrame=now;
  const lampLost=now-lampDriver.seen>600;
  const desired=lampDriver.owner==='simulation'?lampDriver.target:lampLost?lampHome:lampDriver.target;
  const next=lamp.position.clone().lerp(desired,1-Math.exp(-dt*(lampLost?1.8:10)));
- // Conservative expanded bounds include the shade radius and bulb below its center.
- const obstacles=[{minX:puppet.position.x-.65,maxX:puppet.position.x+.65,minZ:puppet.position.z-.55,maxZ:puppet.position.z+.55,top:puppet.position.y+2.75+driver.values[2]*.55},{minX:2.1,maxX:3.9,minZ:-1.65,maxZ:-.65,top:4.6}];
- for(const b of obstacles)if(next.x>b.minX-.6&&next.x<b.maxX+.6&&next.z>b.minZ-.6&&next.z<b.maxZ+.6&&next.y<b.top+.3){
- if(lamp.position.y>=b.top+.3)next.y=b.top+.3;else{next.x=lamp.position.x;next.z=lamp.position.z;next.y=Math.max(next.y,lamp.position.y);}
- }
- lamp.position.copy(next);
- lampStatus.textContent=lampDriver.owner==='simulation'?'模拟控制':!lampDriver.active?'摄像头未开启':lampLost?'等待右手':lampDriver.pinching?'吊线伸缩':'提灯移动';
- segment(cable,v(lamp.position.x,6.2,lamp.position.z),lamp.position.clone().add(v(0,.175,0)));
- light.target.position.set(lamp.position.x,.065,lamp.position.z);
  const idle=!simulation && now-driver.seen>700,alpha=rightHandOnly && !simulation?0:1-Math.exp(-dt*(idle?1.6:(now<driver.recoverUntil?8:18)));
+ const previousPosition=puppet.position.clone(),previousValues=driver.values.slice();
  puppet.position.lerp(simulation||idle?puppetHome:driver.target,alpha);
  const input=actionInput(idle);
  for(let i=0;i<5;i++){const value=input[i];driver.values[i]+=(value-driver.values[i])*alpha;}
- const lift=driver.values[2]*.55;
- for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
-
- // Move the rigid torso and head together with the middle-finger lift.
- for(const child of puppet.children){if(!limbs.some(l=>[l.upper,l.lower,l.joint,l.tip].includes(child))){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}}
+ applyPose();
+ resolveCollision(next,dt,previousPosition,previousValues);
+ lampStatus.textContent=lampDriver.owner==='simulation'?'模拟控制':!lampDriver.active?'摄像头未开启':lampLost?'等待右手':lampDriver.pinching?'吊线伸缩':'提灯移动';
+ segment(cable,v(lamp.position.x,6.2,lamp.position.z),lamp.position.clone().add(v(0,.175,0)));
+ light.target.position.set(lamp.position.x,.065,lamp.position.z);
  names.forEach((_,i)=>{const value=input[i];document.querySelector(`#raw-${i}`).textContent=simulation?'模拟输入':`原始 ${driver.raw[i].toFixed(3)}`;document.querySelector(`#bar-${i}`).value=idle?0:value;document.querySelector(`#value-${i}`).textContent=idle?'未追踪':value.toFixed(2);});
  if(calibration?.running)status.textContent=(calibration.phase?'自然弯指采样':'张手采样')+`：剩余 ${Math.max(0,(2000-calibration.elapsed)/1000).toFixed(1)} 秒`+(now-driver.seen>250?' · 左手丢失，暂停':'');
  controls.update();renderer.render(scene,camera);
