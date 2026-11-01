@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {testHand} from './test-hands.mjs';
 const browser=await chromium.launch({headless:true,channel:'chrome'});
 try {
- const page=await browser.newPage();await page.goto('http://127.0.0.1:5173');await page.waitForFunction(()=>window.theatre);
+ const page=await browser.newPage();await page.goto(process.env.PREVIEW_URL||'http://127.0.0.1:5173');await page.waitForFunction(()=>window.theatre);
  assert.equal(await page.locator('#lamp-status').textContent(),'摄像头未开启');
  await page.locator('#lamp-height').fill('3.6');await page.waitForTimeout(2500);
  const read=()=>page.evaluate(()=>({p:window.theatre.lamp.position.toArray(),owner:window.theatre.lampDriver.owner}));

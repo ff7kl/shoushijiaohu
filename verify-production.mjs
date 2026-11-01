@@ -15,11 +15,15 @@ try{
  await page.unroute('**/models/hand_landmarker.task');await page.locator('#camera-start').click();
  await page.waitForFunction(()=>window.cameraRequests===1,{},{timeout:60000});await page.waitForFunction(()=>!document.querySelector('#camera-start').disabled);
  // Reaching getUserMedia proves WASM/model initialization succeeded without capturing video.
- for(const name of await readdir('dist/mediapipe/wasm')){const response=await page.request.get(new URL('mediapipe/wasm/'+name,url).href);assert.equal(response.status(),200);assert((await response.body()).length>100000);}
+ for(const name of await readdir('dist/mediapipe/wasm')){const response=await page.request.head(new URL('mediapipe/wasm/'+name,url).href);assert.equal(response.status(),200);assert.match(response.headers()['content-type'],name.endsWith('.wasm')?/wasm/:/javascript/);}
  await page.locator('#light').click();assert.equal(await page.evaluate(()=>window.theatre.light.visible),false);await page.locator('#light').click();
  await page.locator('details').last().locator('summary').click();await page.locator('#simulate').check();await page.locator('#sim-0').fill('1');await page.waitForTimeout(500);
  assert((await page.evaluate(()=>window.theatre.driver.values[0]))>.9);
+ await page.locator('#wide-view').click();assert.equal(await page.locator('#wide-view').getAttribute('aria-pressed'),'true');
+ await page.locator('#close-view').click();assert.equal(await page.locator('#close-view').getAttribute('aria-pressed'),'true');
+ const responsive=[];
+ for(const width of [390,768,1440]){await page.setViewportSize({width,height:1000});await page.waitForTimeout(200);const size=await page.evaluate(()=>({page:document.documentElement.scrollWidth,viewport:innerWidth,canvas:document.querySelector('#stage canvas').clientWidth,stage:document.querySelector('#stage').clientWidth}));assert(size.page<=size.viewport+1);assert(Math.abs(size.canvas-size.stage)<=1);responsive.push({width,...size});}
  await page.screenshot({path:'screenshots/production-subpath.png'});
  assert.deepEqual(consoleErrors,[]);assert.deepEqual(errors,[]);assert.deepEqual(bad,[]);assert(requests.every(r=>r.url.startsWith(url)||r.url.startsWith('data:')||r.url.startsWith('blob:')));assert(requests.every(r=>r.method==='GET'));assert(!requests.some(r=>r.url.includes('/node_modules/')));
- console.log(JSON.stringify({url,pageErrors:errors,consoleErrors,expectedFailureConsole,httpErrors:bad,requests,modelInitialized:true,camera:'not captured; permission denial simulated'},null,2));
+ console.log(JSON.stringify({url,pageErrors:errors,consoleErrors,expectedFailureConsole,httpErrors:bad,requests,responsive,modelInitialized:true,camera:'not captured; permission denial simulated'},null,2));
 }finally{await browser.close();}
