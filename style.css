@@ -57,3 +57,5 @@ header{height:64px;padding:8px 24px}.mark{font-size:28px}h1{font-size:22px}heade
 
 #puppet-choice{color-scheme:dark;background:#080b0a;color:#fff;border:1px solid #495346;font:inherit;padding:6px 8px;border-radius:3px}
 #puppet-choice option{background:#080b0a;color:#fff}
+
+@media(max-width:900px){#model-load-status{flex:none;margin:0;padding:3px 12px;font-size:11px;line-height:16px;max-height:44px;overflow:auto;color:#c8cbbf}#mobile-puppet-picker:not([hidden]){top:122px}}
