@@ -23,11 +23,11 @@ export function normalizeCurl(raw, range, sensitivity=1){
  return clamp((raw-open)/span*(Number.isFinite(sensitivity)?sensitivity:1));
 }
 
-export function limbPose(side,leg,value,lift=0){
- const t=clamp(value),root=new Vector3(side*(leg?.19:.43),(leg?.95:1.65)+lift,0);
- const rest=new Vector3(side*(leg?.24:.58),leg?.18:.80,.08);
- const pulled=leg?new Vector3(side*.32,.60,.50):new Vector3(side*1.13,1.90,.38);
- const target=rest.lerp(pulled,t);target.y+=lift;
+export function limbPose(side,leg,value,lift=0,footLift=0){
+ const t=clamp(value,-1,1),root=new Vector3(side*(leg?.19:.43),(leg?.95:1.65)+lift,0);
+ const angle=t*(leg?.8:1.05),reach=leg?.77:.85;
+ const target=new Vector3(root.x+side*(leg?.05:.15),root.y-reach*Math.cos(angle)+(leg?clamp(footLift)*.30:0),reach*Math.sin(angle));
+
  return {root,...solveIK(root,target,leg?.44:.56,leg?.36:.34,new Vector3(side*(leg?.65:.85),leg?.25:-.65,leg?1:1.5))};
 }
 

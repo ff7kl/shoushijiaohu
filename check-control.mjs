@@ -60,3 +60,12 @@ const h=testHand();h[0]={x:0,y:0,z:0};h[9]={x:0,y:1,z:0};h[8]={x:0,y:0,z:0};
 for(const [d,prev,expected] of [[.29,false,true],[.35,true,true],[.35,false,false],[.46,true,false]]){h[4]={x:d,y:0,z:0};assert.equal(pinchState(h,prev),expected);}
 assert.equal(pinchState([] ,true),false);h[9]=h[0];assert.equal(pinchState(h,true),false);
 console.log('掌长归一化捏合滞回及退化输入通过');
+
+for(const side of [-1,1])for(const leg of [false,true])for(const t of [-1,0,1])for(const height of [0,1]){
+ const p=limbPose(side,leg,t,0,height);
+ assert(Math.abs(p.root.distanceTo(p.joint)-(leg?.44:.56))<1e-7);
+ assert(Math.abs(p.joint.distanceTo(p.end)-(leg?.36:.34))<1e-7);
+ if(leg)assert(p.end.y>=.13);
+ if(t)assert(Math.sign(p.end.z)===t);
+}
+console.log('有符号前后摆、独立抬脚与骨长断言通过');
