@@ -1,4 +1,4 @@
-import {palmAngles,signedFinger,headTarget,follow,angleDelta,stepHeight,updatePalm,resetPalm,calibrationResult} from './live-control.js';
+import {palmAngles,signedFinger,headTarget,follow,angleDelta,stepHeight,updatePalm,resetPalm,calibrationResult,updateHeadFlight} from './live-control.js';
 import {createRiggedPuppet} from './rigged-puppet.js';
 import {createStudent} from './student-character.js';
 import './mobile-layout.js';
@@ -129,6 +129,7 @@ window.addEventListener('handtracking',({detail})=>{
 });
 const puppetHome=puppet.position.clone();
 const driver={target:puppetHome.clone(),seen:-Infinity,raw:[0,0,0,0,0],values:[0,0,0,0,0,0,0,0,0],recoverUntil:0};
+const headFlight={raised:false,since:null,height:0};
 const names=['拇指','食指','中指','无名指','小指'];
 const ranges=Array(5).fill(null);
 let calibration=null,sensitivity=1,palmBaseline=null,palmRaw=null,headSeen=-Infinity;
@@ -208,11 +209,11 @@ function applyPose(){
 
  for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift,driver.values[limb.side===1?5:6]);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
 
- student.update?.(driver.values);
+ student.update?.(driver.values,headFlight.height);
  if(student!==riggedStudent){
  const h=student.head;
  if(!h.userData.neckPivot){const pivot=new THREE.Group();pivot.position.set(0,1.78,0);h.parent.add(pivot);pivot.attach(h);h.userData.neckPivot=pivot;}
- const pivot=h.userData.neckPivot;pivot.position.y=1.78+lift;pivot.rotation.set(driver.values[8]*.45,driver.values[7]*.7,0,'YXZ');
+ const pivot=h.userData.neckPivot;pivot.position.y=1.78+lift+headFlight.height;pivot.rotation.set(driver.values[8]*.45,driver.values[7]*.7,0,'YXZ');
  }
  if(student!==riggedStudent){
  const feet=student.footObjects||limbs.filter(l=>l.leg).map(l=>l.tip);
@@ -226,7 +227,7 @@ function applyPose(){
  limb.end.copy(pose.end);segment(limb.upper,limb.root.clone().add(v(0,lift,0)),pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);
  }
  }
- student.update?.(driver.values);
+ student.update?.(driver.values,headFlight.height);
  }
  }
  // Move the rigid torso and head together with the middle-finger lift.
@@ -264,6 +265,9 @@ renderer.setAnimationLoop(()=>{
  const idle=!simulation && now-driver.seen>300,alpha=1-Math.exp(-dt*(idle?1.6:(now<driver.recoverUntil?8:18)));
  const previousPosition=puppet.position.clone(),previousValues=driver.values.slice();
  puppet.position.lerp(simulation||idle?puppetHome:driver.target,alpha);
+ const raised=updateHeadFlight(headFlight,driver.raw,now,!simulation&&!idle);
+ headFlight.height=follow(headFlight.height,raised?2.3:0,dt,3,8);
+ if(Math.abs(headFlight.height-(raised?2.3:0))<.001)headFlight.height=raised?2.3:0;
  const input=actionInput(idle);
  for(let i=0;i<9;i++){const value=input[i]||0;driver.values[i]=simulation?driver.values[i]+(value-driver.values[i])*alpha:follow(driver.values[i],value,dt,i>=7?1.5:3,now<driver.recoverUntil?5:12);}
  liveDiagnostics.target=input.slice();const proposedValues=driver.values.slice();
@@ -280,7 +284,7 @@ renderer.setAnimationLoop(()=>{
  document.querySelector('#render-timing').textContent=`渲染提交 ${liveDiagnostics.renderMs.toFixed(1)} ms · 帧间隔 ${liveDiagnostics.frameMs.toFixed(1)} ms（非 GPU 完成时间）`;
 
 });
-window.theatre={get activeCharacter(){return student;},get activePuppet(){return activePuppet;},get liveCalibration(){return {ranges:ranges.map(r=>r&&({...r})),baseline:palmBaseline&&({...palmBaseline}),palmState:{...palmState}};},liveDiagnostics,liveSettings,scene,camera,renderer,room,props,puppet,lamp,limbs,driver,light,lampDriver,cable};
+window.theatre={get activeCharacter(){return student;},get activePuppet(){return activePuppet;},get liveCalibration(){return {ranges:ranges.map(r=>r&&({...r})),baseline:palmBaseline&&({...palmBaseline}),palmState:{...palmState}};},headFlight,liveDiagnostics,liveSettings,scene,camera,renderer,room,props,puppet,lamp,limbs,driver,light,lampDriver,cable};
 } catch(error){const e=document.querySelector('#error');e.hidden=false;e.textContent='场景无法启动，请确认浏览器已开启硬件加速。'+error.message;console.error(error);}
 
 

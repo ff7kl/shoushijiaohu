@@ -25,3 +25,5 @@ header{height:64px;padding:8px 24px}.mark{font-size:28px}h1{font-size:22px}heade
  .workspace>footer button{min-height:40px;touch-action:manipulation}
  aside{padding:12px}
 }
+
+#build-version{white-space:nowrap}#puppet-entry{display:none}@media(max-width:900px){#puppet-entry{display:block;margin:8px 12px;min-height:44px}header{flex-wrap:wrap}#build-version{font-size:11px}}

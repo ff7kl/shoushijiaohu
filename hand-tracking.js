@@ -1,3 +1,4 @@
+import {frameReady} from './tracking-state.js';
 import {FilesetResolver, HandLandmarker} from '@mediapipe/tasks-vision';
 
 const video = document.querySelector('#camera-video');
@@ -14,6 +15,20 @@ video.style.transform=canvas.style.transform='scaleX(-1)';
 function assignSide(label){return label==='Left'?'left':'right';}
 let previousUpdate=0;
 const inferenceSamples=[];
+const liveInfo=document.createElement('p');liveInfo.id='tracking-live';liveInfo.setAttribute('role','status');status.after(liveInfo);
+const metrics={model:'未加载',count:0,last:0,hands:0,ms:0,drawn:false,error:'',videoChanged:performance.now()};
+let observedTime=-1,lastAttempt=0;
+function resizeOverlay(){if(video.videoWidth && video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;video.parentElement.style.aspectRatio=video.videoWidth+'/'+video.videoHeight;}}
+video.addEventListener('resize',resizeOverlay);
+function updateDiagnostic(){
+ const now=performance.now(),track=stream?.getVideoTracks()[0];
+ if(video.currentTime!==observedTime){observedTime=video.currentTime;metrics.videoChanged=now;}
+ const age=metrics.last?((now-metrics.last)/1000).toFixed(1)+'秒前':'无';
+ liveInfo.textContent=video.videoWidth+'×'+video.videoHeight+' · ready '+video.readyState+' · 轨道 '+(track?.readyState||'无')+(track?.muted?' / muted':'')+' · 模型 '+metrics.model+' · 推理 '+metrics.count+' 次 / '+age+' · 手 '+metrics.hands+' · '+metrics.ms.toFixed(1)+'ms · 视频 '+video.currentTime.toFixed(2)+'s';
+ if(!stream)return;
+ status.textContent=metrics.error?'推理失败：'+metrics.error+'；请重启摄像头':metrics.model!=='就绪'?'A：模型'+metrics.model:document.hidden?'后台暂停，返回后恢复':now-metrics.videoChanged>3000?'B：视频帧停滞，请重新开启摄像头':!metrics.last||now-metrics.last>3000?'B：等待有效帧或推理停滞，请重启摄像头':!metrics.hands?'C：推理正常，未检测到手。确认前置摄像头、光线充足，完整手掌靠近镜头':!metrics.drawn?'D：已检测到手，骨架绘制异常':!window.theatre?.liveCalibration?.baseline?'E：骨架正常，请完成自然中立校准':'骨架正常，已校准';
+}
+setInterval(updateDiagnostic,500);
 let modelPromise,permissionPending=false;
 let model, stream, generation=0, frame=0, lastVideoTime=-1, busy=false;
 function publish(left=emptyHand(), right=emptyHand()) {
@@ -48,13 +63,14 @@ function draw() {
 }
 function loop(token) {
   if(token!==generation || !stream) return;
-  if(video.readyState>=2 && video.currentTime!==lastVideoTime && !busy) {
-    busy=true;
+  if(frameReady({model,live:stream.getVideoTracks().some(t=>t.readyState==='live'),hidden:document.hidden,width:video.videoWidth,height:video.videoHeight,readyState:video.readyState,time:video.currentTime,lastTime:lastVideoTime,busy,now:performance.now(),lastAttempt,inferenceMs:metrics.ms})) {
+    busy=true;lastAttempt=performance.now();
     try {
       lastVideoTime=video.currentTime;
       const started=performance.now();
       const result=model.detectForVideo(video,started);
       const inference=performance.now()-started;
+      metrics.count++;metrics.last=performance.now();metrics.ms=inference;metrics.hands=result.landmarks.length;metrics.drawn=false;
       inferenceSamples.push(inference);if(inferenceSamples.length>120)inferenceSamples.shift();
       const sorted=inferenceSamples.slice().sort((a,b)=>a-b);
       window.handPerformance={inferenceMs:inference,p50:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.95))],updateMs:previousUpdate?started-previousUpdate:null,samples:(window.handPerformance?.samples||0)+1};
@@ -69,12 +85,12 @@ function loop(token) {
         if(hands[side].visible) return;
         hands[side]={visible:true,landmarks:points,worldLandmarks:result.worldLandmarks?.[i]};
       });
-      publish(hands.left,hands.right); draw();
+      publish(hands.left,hands.right); resizeOverlay();draw();metrics.drawn=hands.left.visible||hands.right.visible;
       document.querySelector('#mapping-debug').textContent='原始标签 → 最终身份：'+(result.handedness.map(h=>{const label=h[0]?.categoryName;return label+' → '+(assignSide(label)==='left'?'真实左手（木偶）':'真实右手（悬灯）');}).join('；')||'无')+' · 固定身份映射';
       document.querySelector('#left-status').textContent='你的左手：'+(hands.left.visible?'已追踪':'未发现');
       document.querySelector('#right-status').textContent='你的右手：'+(hands.right.visible?'已追踪':'未发现');
       status.textContent=hands.left.visible||hands.right.visible?'已追踪':'正在寻找手';
-    } catch(error) { failure('追踪运行',error); }
+    } catch(error) { metrics.error=error.message;failure('追踪运行',error); }
     finally {busy=false;}
   }
   if(token===generation && stream) frame=requestAnimationFrame(()=>loop(token));
@@ -82,7 +98,7 @@ function loop(token) {
 const officialURL='https://ff7kl.github.io/shoushijiaohu/';
 const diagnostics=document.createElement('details');diagnostics.id='camera-diagnostics';
 diagnostics.innerHTML='<summary>摄像头诊断</summary><pre id="camera-diagnostic-info" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
-document.querySelector('.calibration').append(diagnostics);
+document.querySelector('.camera-controls').append(diagnostics);
 const cameraInfo={step:'等待点击',errorName:'无',explanation:''};
 function showStep(step,error=null,explanation=''){
  cameraInfo.step=step;cameraInfo.errorName=error?.name||'无';cameraInfo.explanation=explanation;
@@ -93,20 +109,23 @@ function showStep(step,error=null,explanation=''){
 function failure(step,error){
  const guidance={NotAllowedError:'可能已拒绝权限或被系统/页面策略限制。请在网址旁的站点设置允许摄像头，并检查系统中该浏览器的摄像头权限，再点击重试；网页不能强制重新弹出授权框。',SecurityError:'浏览器或页面策略禁止摄像头，请检查站点权限或直接打开正式HTTPS网址。',NotFoundError:'未找到可用摄像头。',NotReadableError:'摄像头无法读取，可能被其他应用占用，请关闭占用程序后重试。',OverconstrainedError:'摄像头无法满足请求条件，请换用系统浏览器重试。',AbortError:'启动已中断，可以重新点击开启。'};
  const embedded=/MicroMessenger|QQ\//i.test(navigator.userAgent)?' 请从右上角菜单选择“使用系统浏览器打开”。':'';
+ if(step==='模型加载')metrics.model='失败：'+error.message;
  const explanation=(step==='模型加载'?'视频已获得权限，但手部模型加载失败；请检查网络后重试。':step==='视频启动'?'视频播放失败，请重新点击开启；也请检查浏览器的视频播放限制。':guidance[error.name]||'此浏览器未能启动摄像头，请检查权限后重试。')+embedded;
  stop(`${step}失败（${error.name||'Error'}）：${explanation}`);showStep(`${step}失败`,error,explanation);
 }
 function ensureModel(){
  if(model)return Promise.resolve(model);
+ metrics.model='加载中';
  if(!modelPromise)modelPromise=(async()=>{
   const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
-  model=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},runningMode:'VIDEO',numHands:2});return model;
+  model=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},runningMode:'VIDEO',numHands:2});metrics.model='就绪';return model;
  })().finally(()=>{modelPromise=null;});
  return modelPromise;
 }
 showStep('等待点击');
 startButton.onclick=async()=>{
  if(startButton.disabled||permissionPending)return;
+ Object.assign(metrics,{count:0,last:0,hands:0,ms:0,error:'',drawn:false,videoChanged:performance.now()});
  const token=++generation;startButton.disabled=true;stopButton.disabled=false;
  showStep('按钮点击');
  if(!isSecureContext){const error=new DOMException('需要HTTPS','SecurityError');stop(`当前地址不安全，请使用正式HTTPS网址：${officialURL}`);showStep('环境检查失败',error,`HTTP局域网IP不能申请手机摄像头。请使用 ${officialURL}`);return;}
@@ -138,3 +157,5 @@ window.addEventListener('handtracking',({detail})=>{
   if(!detail.right.visible) document.querySelector('#right-status').textContent='你的右手：未发现';
 });
 
+
+document.addEventListener('visibilitychange',()=>{if(!document.hidden && stream){metrics.videoChanged=performance.now();video.play().catch(error=>{metrics.error='返回前台播放失败：'+error.message;});updateDiagnostic();}});

@@ -86,7 +86,7 @@ export function createStudent(puppet,limbs,model='student-v7.glb'){
   }
   student.footObjects=parts.filter(p=>p.tip?.leg).map(p=>p.group);
   student.loaded=true;student.update();
- },undefined,error=>console.error('Student GLB load failed; using fallback',error));
+ },undefined,error=>{student.loadError=error.message || '模型请求失败';console.error(error);});
  return student;
 }
 

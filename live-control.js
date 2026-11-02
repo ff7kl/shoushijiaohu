@@ -68,3 +68,15 @@ export function calibrationResult(ranges,indices,open,neutral,closed,baseline,ne
  for(const i of indices){if([open[i],neutral[i],closed[i]].every(Number.isFinite)&&neutral[i]-open[i]>=.025&&closed[i]-neutral[i]>=.025)next[i]={open:open[i],neutral:neutral[i],closed:closed[i]};else failed.push(i);}
  return {ranges:next,failed,baseline:indices.length===5&&newBaseline?{...newBaseline}:baseline};
 }
+
+// Four fingers decide the gesture; the thumb can rest outside the fist.
+export function updateHeadFlight(state, raw, now, visible=true){
+ if(!visible||!Array.isArray(raw)||raw.length!==5||!raw.every(Number.isFinite)){
+  state.raised=false;state.since=null;return false;
+ }
+ const fingers=raw.slice(1),closed=fingers.every(x=>x>.22),open=fingers.every(x=>x<.12);
+ if(open){state.raised=false;state.since=null;}
+ else if(closed){state.since??=now;if(now-state.since>=200)state.raised=true;}
+ else state.since=null;
+ return !!state.raised;
+}

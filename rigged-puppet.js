@@ -38,9 +38,10 @@ export function createRiggedPuppet(group){
   }
   const headBone=bones.get('Head')||bones.get('Neck'),headRest=headBone?.quaternion.clone();
   state.headBone=headBone;state.headRest=headRest;state.chains=chains;state.meshes=meshes;
-  state.update=values=>{
+  const headPosition=headBone?.position.clone();
+  state.update=(values,flightHeight=0)=>{
 
-   if(headBone)headBone.quaternion.copy(headRest);
+   if(headBone){headBone.quaternion.copy(headRest);headBone.position.copy(headPosition);}
    group.updateWorldMatrix(true,true);
    for(const c of chains){
     c.upper.quaternion.copy(c.restUpper);c.lower.quaternion.copy(c.restLower);
@@ -51,6 +52,12 @@ export function createRiggedPuppet(group){
    group.updateWorldMatrix(true,true);
    if(headBone)headBone.quaternion.copy(headRest).multiply(new T.Quaternion().setFromEuler(new T.Euler((values[8]||0)*.45,(values[7]||0)*.7,0,'YXZ')));
    group.updateWorldMatrix(true,true);
+   if(headBone&&flightHeight){
+    const origin=headBone.getWorldPosition(new T.Vector3());
+    const offset=new T.Vector3(0,flightHeight,0).applyMatrix4(group.matrixWorld).sub(group.getWorldPosition(new T.Vector3()));
+    headBone.position.copy(headBone.parent.worldToLocal(origin.add(offset)));
+    group.updateWorldMatrix(true,true);
+   }
    for(const mesh of meshes){mesh.skeleton.update();mesh.computeBoundingBox();mesh.computeBoundingSphere();}
   };
   state.loaded=true;group.userData.rigLoaded=true;state.update([0,0,0,0,0]);

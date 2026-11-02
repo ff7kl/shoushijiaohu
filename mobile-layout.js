@@ -8,3 +8,7 @@ function arrange(){
 }
 mobile.addEventListener('change',arrange);
 arrange();
+
+const entry=document.createElement('button');entry.id='puppet-entry';entry.textContent='选择人偶 · 四种角色';
+entry.onclick=()=>{const select=document.querySelector('#puppet-choice');select.scrollIntoView({block:'center'});select.focus({preventScroll:true});};stage.before(entry);
+const version=document.createElement('small');version.id='build-version';version.textContent='构建 '+__BUILD_SHA__;document.querySelector('header').append(version);
