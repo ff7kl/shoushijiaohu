@@ -28,8 +28,14 @@ assert((await page.locator('#calibration-status').textContent()).includes('食�
 assert((await page.locator('#range-1').textContent()).includes('保留原校准'));
 await page.evaluate(()=>{window.testYaw=0;window.testPitch=0;window.sendFake(Array(5).fill(.8));});
 const prior=await page.evaluate(()=>window.theatre.liveCalibration.palmState);
-await page.evaluate(()=>{window.testYaw=3;window.fakeTimer=setInterval(()=>window.sendFake(Array(5).fill(.8)),25);});await page.waitForTimeout(600);await page.evaluate(()=>clearInterval(window.fakeTimer));
+await page.evaluate(()=>{window.testYaw=2;window.fakeTimer=setInterval(()=>{window.testYaw=-window.testYaw;window.sendFake(Array(5).fill(.8));},25);});await page.waitForTimeout(600);await page.evaluate(()=>clearInterval(window.fakeTimer));
 const rejected=await page.evaluate(()=>window.theatre.liveCalibration.palmState);assert.equal(rejected.current,null);assert.equal(rejected.validAt,prior.validAt);assert.deepEqual(rejected.lastValid,prior.lastValid);
 await page.evaluate(()=>{window.testYaw=0;window.sendFake(Array(5).fill(.8));});assert(await page.evaluate(()=>!!window.theatre.liveCalibration.palmState.current));
+await page.evaluate(()=>{window.testYaw=2;window.fakeTimer=setInterval(()=>window.sendFake(Array(5).fill(.8)),25);});
+await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>window.theatre.liveCalibration.palmState.current),null);
+await page.waitForTimeout(350);assert(await page.evaluate(()=>!!window.theatre.liveCalibration.palmState.current));
+await page.evaluate(()=>clearInterval(window.fakeTimer));
+assert.deepEqual(await page.evaluate(()=>window.theatre.liveCalibration.baseline),baselineBefore);
+assert((await page.evaluate(()=>window.theatre.driver.values)).every(Number.isFinite));
 const timing=await page.evaluate(async()=>{const samples=[];for(let i=0;i<90;i++){await new Promise(requestAnimationFrame);samples.push({...window.theatre.liveDiagnostics});}const stats=key=>{const v=samples.map(x=>x[key]).sort((a,b)=>a-b);return {p50:v[45],p95:v[85]};};return {renderSubmitMs:stats('renderMs'),frameMs:stats('frameMs'),samples:samples.length};});
 await page.screenshot({path:'screenshots/live-control-debug.png'});writeFileSync('screenshots/live-control-results.json',JSON.stringify({kind:'synthetic landmarks, not camera',active,head,lost,reentry,timing,inference:'not measured: real camera required'},null,2));await browser.close();console.log('浏览器三步校准、独立四肢、双手事件、丢手回中、重入限速通过');

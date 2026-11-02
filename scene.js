@@ -1,4 +1,4 @@
-import {palmAngles,signedFinger,headTarget,follow,angleDelta,stepHeight,updatePalm,calibrationResult} from './live-control.js';
+import {palmAngles,signedFinger,headTarget,follow,angleDelta,stepHeight,updatePalm,resetPalm,calibrationResult} from './live-control.js';
 import {createRiggedPuppet} from './rigged-puppet.js';
 import {createStudent} from './student-character.js';
 import './mobile-layout.js';
@@ -169,10 +169,10 @@ document.querySelector('#sample').onclick=()=>{if(calibration){calibration.runni
 document.querySelector('#sensitivity').oninput=e=>{sensitivity=Number(e.target.value);document.querySelector('#sensitivity-value').textContent=sensitivity.toFixed(2);};
 document.querySelector('#sensitivity-reset').onclick=()=>{sensitivity=1;document.querySelector('#sensitivity').value=1;document.querySelector('#sensitivity-value').textContent='1.00';};
 window.addEventListener('handtracking',({detail})=>{
- if(!detail.active){simulation=false;document.querySelector('#simulate').checked=false;driver.seen=-Infinity;driver.target.copy(puppetHome);driver.raw.fill(0);if(calibration)calibration.last=0;}
+ if(!detail.active){resetPalm(palmState,'camera-off');palmRaw=null;headSeen=-Infinity;simulation=false;document.querySelector('#simulate').checked=false;driver.seen=-Infinity;driver.target.copy(puppetHome);driver.raw.fill(0);if(calibration)calibration.last=0;}
  if(simulation)return;
  const target=detail.active && detail.left?.visible?handPosition(detail.left.landmarks):null;
- if(!target){palmRaw=updatePalm(palmState,null,performance.now());if(calibration)calibration.last=0;return;}
+ if(!target){resetPalm(palmState,detail.active?'lost':'camera-off');palmRaw=null;headSeen=palmState.validAt;if(calibration)calibration.last=0;return;}
  driver.target.copy(target);
  const pts=detail.left.landmarks,now=performance.now();if(now-driver.seen>250)driver.recoverUntil=now+300;driver.raw=curls(pts);driver.seen=now;
  const candidate=palmAngles(detail.left.worldLandmarks||pts);

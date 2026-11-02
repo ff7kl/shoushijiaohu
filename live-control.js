@@ -36,13 +36,31 @@ export function guardPalm(current,previous,elapsed){
  return current;
 }
 
+export function resetPalm(state,reason='lost'){
+ state.current=null;state.pending=null;state.reason=reason;
+ if(reason==='lost'||reason==='camera-off'){
+  state.lastValid=null;state.validAt=-Infinity;state.candidateAt=-Infinity;
+ }
+}
 export function updatePalm(state,candidate,now){
  state.current=null;
- if(!candidate)return null;
+ if(!candidate||![candidate.yaw,candidate.pitch,now].every(Number.isFinite)){resetPalm(state,'degenerate');return null;}
  const gap=now-(state.candidateAt??-Infinity);
+ if(gap>1000)resetPalm(state,'lost');
  state.candidateAt=now;
- const accepted=guardPalm(candidate,state.lastValid,gap>1000?Infinity:0);
- if(accepted){state.lastValid={...accepted};state.validAt=now;state.current=state.lastValid;}
+ let accepted=guardPalm(candidate,state.lastValid,0);
+ if(!accepted){
+  const pending=state.pending;
+  // Compare against the start of the window: alternating noise cannot drift into acceptance.
+  if(!pending||gap>150||Math.abs(angleDelta(candidate.yaw,pending.anchor.yaw))>.12||Math.abs(angleDelta(candidate.pitch,pending.anchor.pitch))>.12){
+   state.pending={anchor:{...candidate},since:now,count:1};
+  }else{
+   pending.count++;
+   if(now-pending.since>=350&&pending.count>=8)accepted=candidate;
+  }
+ }
+ if(accepted){state.lastValid={...accepted};state.validAt=now;state.current=state.lastValid;state.pending=null;state.reason='valid';}
+ else state.reason='jump-or-unstable';
  return state.current;
 }
 export function calibrationResult(ranges,indices,open,neutral,closed,baseline,newBaseline=null){
