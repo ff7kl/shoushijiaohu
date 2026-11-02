@@ -19,9 +19,10 @@ export function createRiggedPuppet(group){
   const meshes=[],bones=new Map();
   scene.traverse(o=>{
    if(o.isBone)bones.set(o.name.replace(/^mixamorig[:_]?/,''),o);
-   if(o.isSkinnedMesh){o.normalizeSkinWeights();o.castShadow=o.receiveShadow=true;o.material=material;meshes.push(o);}
+   if(o.isSkinnedMesh){o.frustumCulled=false;o.normalizeSkinWeights();o.castShadow=o.receiveShadow=true;o.material=material;meshes.push(o);}
   });
-  addLayeredHair(scene,bones.get('Head'),bounds);
+  scene.updateWorldMatrix(true,true);
+  addLayeredHair(scene,bones.get('Head'),new T.Box3().setFromObject(scene));
   const chains=[];
   for(const side of ['Left','Right'])for(const leg of [false,true]){
    const names=leg?['UpLeg','Leg','Foot']:['Arm','ForeArm','Hand'];
@@ -29,7 +30,8 @@ export function createRiggedPuppet(group){
    if(chain.some(b=>!b))throw new Error('缺少骨骼：'+side+names.join('/'));
    const [upper,lower,tip]=chain;
    group.updateWorldMatrix(true,true);
-   const sign=group.worldToLocal(upper.getWorldPosition(new T.Vector3())).x>0?1:-1;
+   // Imported model origins need not lie between the left and right limbs.
+   const sign=side==='Left'?1:-1;
    chains.push({upper,lower,tip,leg,sign,index:leg?(sign===1?3:4):(sign===1?0:1),restUpper:upper.quaternion.clone(),restLower:lower.quaternion.clone()});
   }
   function aim(bone,child,direction){
@@ -61,7 +63,7 @@ export function createRiggedPuppet(group){
     headBone.position.copy(headBone.parent.worldToLocal(origin.add(offset)));
     group.updateWorldMatrix(true,true);
    }
-   for(const mesh of meshes){mesh.skeleton.update();mesh.computeBoundingBox();mesh.computeBoundingSphere();}
+   for(const mesh of meshes){mesh.skeleton.update();mesh.computeBoundingBox();}
   };
   state.loaded=true;group.userData.rigLoaded=true;state.update([0,0,0,0,0]);
  },undefined,error=>{group.userData.rigError=error.message;console.error('骨骼木偶加载失败',error);});

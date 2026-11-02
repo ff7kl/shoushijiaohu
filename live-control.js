@@ -10,7 +10,8 @@ export function palmAngles(points){
  area.normalize();return {yaw:Math.atan2(area.x,area.z),pitch:Math.atan2(area.y,Math.hypot(area.x,area.z))};
 }
 export function signedFinger(raw,range,gain=1){
- if(!range||![raw,range.open,range.neutral,range.closed].every(Number.isFinite))return {value:0,limited:false};
+ range??={open:.03,neutral:.03,closed:.35};
+ if(![raw,range.open,range.neutral,range.closed].every(Number.isFinite))return {value:0,limited:false};
  const delta=raw-range.neutral,span=delta<0?range.neutral-range.open:range.closed-range.neutral;
  if(span<.025)return {value:0,limited:false};
  const dead=span*.15,value=Math.sign(delta)*Math.max(0,(Math.abs(delta)-dead)/(span-dead))*gain;
@@ -28,7 +29,7 @@ export function follow(current,target,dt,rate=3,speed=12){
 // Positive control traverses an independent step arc; no clock or gait oscillator.
 export function stepHeight(value){
  const t=clamp(value,-1,1);
- return (t>=0?.65:.12)*Math.sin(Math.PI*Math.abs(t));
+ return .65*Math.max(0,t);
 }
 export function guardPalm(current,previous,elapsed){
  if(!current)return null;
@@ -64,9 +65,16 @@ export function updatePalm(state,candidate,now){
  return state.current;
 }
 export function calibrationResult(ranges,indices,open,neutral,closed,baseline,newBaseline=null){
- const next=ranges.slice(),failed=[];
- for(const i of indices){if([open[i],neutral[i],closed[i]].every(Number.isFinite)&&neutral[i]-open[i]>=.025&&closed[i]-neutral[i]>=.025)next[i]={open:open[i],neutral:neutral[i],closed:closed[i]};else failed.push(i);}
- return {ranges:next,failed,baseline:indices.length===5&&newBaseline?{...newBaseline}:baseline};
+ const next=ranges.slice(),failed=[],reasons={};
+ for(const i of indices){
+  let reason='';
+  if(![open[i],neutral[i],closed[i]].every(Number.isFinite))reason='采样无效，请保持手掌入镜';
+  else if(open[i]-neutral[i]>.025)reason='伸展比自然中立更弯曲，请按顺序重试';
+  else if(closed[i]-neutral[i]<.025)reason='弯曲与中立差异不足，请增大弯曲幅度';
+  if(reason){failed.push(i);reasons[i]=reason;}
+  else next[i]={open:Math.min(open[i],neutral[i]),neutral:neutral[i],closed:closed[i]};
+ }
+ return {ranges:next,failed,reasons,baseline:indices.length===5&&newBaseline?{...newBaseline}:baseline};
 }
 
 // Four fingers decide the gesture; the thumb can rest outside the fist.
@@ -79,4 +87,23 @@ export function updateHeadFlight(state, raw, now, visible=true){
  else if(closed){state.since??=now;if(now-state.since>=200)state.raised=true;}
  else state.since=null;
  return !!state.raised;
+}
+
+// Finger order: thumb, index, middle, ring, pinky. Pose slots retain rig compatibility.
+export function fingerPose(fingers,limbRange=1,headGain=1,headRange=1){
+ const [thumb,index,middle,ring,pinky]=fingers;
+ return [middle*limbRange,index*limbRange,0,ring*limbRange,pinky*limbRange,stepHeight(ring)*limbRange,stepHeight(pinky)*limbRange,clamp(thumb*headGain,-1,1)*headRange,0];
+}
+
+export function stableFingerSample(samples,indices){
+ if(samples.length<4)return {ok:false,reason:'有效帧不足4帧，请保持姿势重采'};
+ const mean=Array(5).fill(0),noise=Array(5).fill(0);
+ for(let i=0;i<5;i++){
+  const values=samples.map(s=>s[i]).sort((a,b)=>a-b);
+  if(values.some(v=>!Number.isFinite(v)))return {ok:false,reason:'手指关键点无效，请重新入镜'};
+  mean[i]=values[Math.floor(values.length/2)];
+  noise[i]=values[Math.floor((values.length-1)*.9)]-values[Math.floor((values.length-1)*.1)];
+ }
+ // Median sampling tolerates ordinary hand movement; calibration is optional.
+ return {ok:true,mean,noise};
 }

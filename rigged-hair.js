@@ -6,7 +6,7 @@ export function addLayeredHair(scene,head,bounds){
  const palette=['#030303','#030303','#030303','#030303'];
  scene.updateWorldMatrix(true,true);
  let seed=71;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
- function local(p){return head.worldToLocal(scene.localToWorld(new T.Vector3(center.x+p.x*height,bounds.min.y+p.y*height,center.z+p.z*height)));}
+ function local(p){return head.worldToLocal(new T.Vector3(center.x+p.x*height,bounds.min.y+p.y*height,center.z+p.z*height));}
  // Continuous dark scalp under the locks prevents see-through gaps from above.
  const capPositions=[],capIndices=[];
  for(let row=0;row<=16;row++)for(let col=0;col<=64;col++){

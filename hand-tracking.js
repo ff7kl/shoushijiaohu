@@ -1,5 +1,5 @@
 import {frameReady} from './tracking-state.js';
-import {FilesetResolver, HandLandmarker} from '@mediapipe/tasks-vision';
+import {HandLandmarker} from '@mediapipe/tasks-vision';
 
 const video = document.querySelector('#camera-video');
 const canvas = document.querySelector('#hand-overlay');
@@ -18,7 +18,7 @@ const inferenceSamples=[];
 const liveInfo=document.createElement('p');liveInfo.id='tracking-live';liveInfo.setAttribute('role','status');status.after(liveInfo);
 const metrics={model:'未加载',count:0,last:0,hands:0,ms:0,drawn:false,error:'',videoChanged:performance.now()};
 let observedTime=-1,lastAttempt=0;
-function resizeOverlay(){if(video.videoWidth && video.videoHeight){canvas.width=video.videoWidth;canvas.height=video.videoHeight;video.parentElement.style.aspectRatio=video.videoWidth+'/'+video.videoHeight;}}
+function resizeOverlay(){if(video.videoWidth && video.videoHeight){if(canvas.width!==video.videoWidth)canvas.width=video.videoWidth;if(canvas.height!==video.videoHeight)canvas.height=video.videoHeight;video.parentElement.style.aspectRatio=video.videoWidth+'/'+video.videoHeight;}}
 video.addEventListener('resize',resizeOverlay);
 function updateDiagnostic(){
  const now=performance.now(),track=stream?.getVideoTracks()[0];
@@ -26,7 +26,7 @@ function updateDiagnostic(){
  const age=metrics.last?((now-metrics.last)/1000).toFixed(1)+'秒前':'无';
  liveInfo.textContent=video.videoWidth+'×'+video.videoHeight+' · ready '+video.readyState+' · 轨道 '+(track?.readyState||'无')+(track?.muted?' / muted':'')+' · 模型 '+metrics.model+' · 推理 '+metrics.count+' 次 / '+age+' · 手 '+metrics.hands+' · '+metrics.ms.toFixed(1)+'ms · 视频 '+video.currentTime.toFixed(2)+'s';
  if(!stream)return;
- status.textContent=metrics.error?'推理失败：'+metrics.error+'；请重启摄像头':metrics.model!=='就绪'?'A：模型'+metrics.model:document.hidden?'后台暂停，返回后恢复':now-metrics.videoChanged>3000?'B：视频帧停滞，请重新开启摄像头':!metrics.last||now-metrics.last>3000?'B：等待有效帧或推理停滞，请重启摄像头':!metrics.hands?'C：推理正常，未检测到手。确认前置摄像头、光线充足，完整手掌靠近镜头':!metrics.drawn?'D：已检测到手，骨架绘制异常':!window.theatre?.liveCalibration?.ranges?.every(Boolean)?'E：骨架正常，请完成三步五指校准（见下方进度）':!tracking.left.visible?'已校准；请将左手完整入镜控制木偶':'骨架正常，五指已校准';
+ status.textContent=metrics.error?'推理失败：'+metrics.error+'；请重启摄像头':metrics.model!=='就绪'?'A：模型'+metrics.model:document.hidden?'后台暂停，返回后恢复':now-metrics.videoChanged>3000?'B：视频帧停滞，请重新开启摄像头':!metrics.last||now-metrics.last>3000?'B：等待有效帧或推理停滞，请重启摄像头':!metrics.hands?'C：推理正常，未检测到手。确认前置摄像头、光线充足，完整手掌靠近镜头':!metrics.drawn?'D：已检测到手，骨架绘制异常':!window.theatre?.liveCalibration?.ranges?.every(Boolean)?'骨架正常，默认手指控制已启用，可选个人校准':!tracking.left.visible?'已校准；请将左手完整入镜控制木偶':'骨架正常，五指已校准';
 }
 setInterval(updateDiagnostic,500);
 let modelPromise,permissionPending=false;
@@ -61,15 +61,15 @@ function draw() {
     });
   }
 }
-function loop(token) {
+async function loop(token) {
   if(token!==generation || !stream) return;
   if(frameReady({model,live:stream.getVideoTracks().some(t=>t.readyState==='live'),hidden:document.hidden,width:video.videoWidth,height:video.videoHeight,readyState:video.readyState,time:video.currentTime,lastTime:lastVideoTime,busy,now:performance.now(),lastAttempt,inferenceMs:metrics.ms})) {
     busy=true;lastAttempt=performance.now();
     try {
       lastVideoTime=video.currentTime;
       const started=performance.now();
-      const result=model.detectForVideo(video,started);
-      const inference=performance.now()-started;
+      const {result,inference}=await model.detect(video,started);
+      if(token!==generation || !stream)return;
       metrics.count++;metrics.last=performance.now();metrics.ms=inference;metrics.hands=result.landmarks.length;metrics.drawn=false;
       inferenceSamples.push(inference);if(inferenceSamples.length>120)inferenceSamples.shift();
       const sorted=inferenceSamples.slice().sort((a,b)=>a-b);
@@ -90,7 +90,7 @@ function loop(token) {
       document.querySelector('#left-status').textContent='你的左手：'+(hands.left.visible?'已追踪':'未发现');
       document.querySelector('#right-status').textContent='你的右手：'+(hands.right.visible?'已追踪':'未发现');
       status.textContent=hands.left.visible||hands.right.visible?'已追踪':'正在寻找手';
-    } catch(error) { metrics.error=error.message;failure('追踪运行',error); }
+    } catch(error) { if(token===generation){metrics.error=error.message;failure('追踪运行',error);} }
     finally {busy=false;}
   }
   if(token===generation && stream) frame=requestAnimationFrame(()=>loop(token));
@@ -117,8 +117,14 @@ function ensureModel(){
  if(model)return Promise.resolve(model);
  metrics.model='加载中';
  if(!modelPromise)modelPromise=(async()=>{
-  const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
-  model=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},runningMode:'VIDEO',numHands:2});metrics.model='就绪';return model;
+  const worker=new Worker(new URL('mediapipe/hand-worker.js',new URL(import.meta.env.BASE_URL,location.href)));
+  let pending;
+  const request=(message,transfer=[])=>new Promise((resolve,reject)=>{pending={resolve,reject};worker.postMessage(message,transfer);});
+  worker.onmessage=({data})=>{const task=pending;pending=null;if(data.error)task?.reject(new Error(data.error));else task?.resolve(data);};
+  worker.onerror=event=>{pending?.reject(new Error(event.message||'Worker failed'));pending=null;worker.terminate();model=null;};
+  try{await request({type:'init'});}catch(error){worker.terminate();throw error;}
+  model={async detect(video,timestamp){const bitmap=await createImageBitmap(video);try{return await request({type:'frame',bitmap,timestamp},[bitmap]);}finally{bitmap.close();}}};
+  metrics.model='就绪';return model;
  })().finally(()=>{modelPromise=null;});
  return modelPromise;
 }
