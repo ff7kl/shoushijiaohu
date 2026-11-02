@@ -65,14 +65,18 @@ for(const x of [-.16,.16]){ball(.07,iron,x,2.16,.38,classicHead);ball(.018,mat('
 rod(v(0,1.7,0),v(0,1.85,0),.09,skin,classicHead);
 const classicLimbs=limbs.slice(),studentGroup=new THREE.Group();
 const studentLimbs=limbs.map(l=>{const copy={...l,end:l.end.clone()};for(const key of ['upper','lower','joint','tip']){copy[key]=l[key].clone();studentGroup.add(copy[key]);}return copy;});
-const modernStudent=createStudent(studentGroup,studentLimbs);
+let modernStudent=null;
 const woodenGroup=new THREE.Group(),woodenLimbs=classicLimbs.map(l=>{const copy={...l,end:l.end.clone()};for(const key of ['upper','lower','joint','tip']){copy[key]=l[key].clone();woodenGroup.add(copy[key]);}return copy;});
-const woodenStudent=createStudent(woodenGroup,woodenLimbs,'wooden-puppet.glb');
-const riggedGroup=new THREE.Group(),riggedStudent=createRiggedPuppet(riggedGroup);
+let woodenStudent=null;
+const riggedGroup=new THREE.Group();let riggedStudent=null;
 let student=modernStudent,activePuppet=studentGroup;puppet.add(activePuppet);
 const puppetChoice=document.querySelector('#puppet-choice');
 puppetChoice.addEventListener('change',()=>{
- const classic=puppetChoice.value==='classic',wooden=puppetChoice.value==='wooden',rigged=puppetChoice.value==='rigged';puppet.remove(activePuppet);activePuppet=rigged?riggedGroup:classic?classicGroup:wooden?woodenGroup:studentGroup;puppet.add(activePuppet);
+ const classic=puppetChoice.value==='classic',wooden=puppetChoice.value==='wooden',rigged=puppetChoice.value==='rigged';
+ if(rigged)riggedStudent??=createRiggedPuppet(riggedGroup);
+ else if(wooden)woodenStudent??=createStudent(woodenGroup,woodenLimbs,'wooden-puppet.glb');
+ else if(!classic)modernStudent??=createStudent(studentGroup,studentLimbs);
+puppet.remove(activePuppet);activePuppet=rigged?riggedGroup:classic?classicGroup:wooden?woodenGroup:studentGroup;puppet.add(activePuppet);
  limbs.splice(0,limbs.length,...(classic?classicLimbs:wooden?woodenLimbs:studentLimbs));student=rigged?riggedStudent:classic?{body:classicBody,head:classicHead}:wooden?woodenStudent:modernStudent;
 });
 puppetChoice.dispatchEvent(new Event('change'));
