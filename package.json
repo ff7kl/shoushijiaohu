@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite",
-    "check": "node --check hand-tracking.js && node --check scene.js && node --check student-character.js && node --check server.mjs && node --check puppet-control.js && node check-control.mjs && node check-collision.mjs && node --check vite.config.js && node --check scripts/prepare-assets.mjs",
+    "check": "node --check hand-tracking.js && node --check scene.js && node --check student-character.js && node --check server.mjs && node --check puppet-control.js && node check-control.mjs && node check-live-control.mjs && node check-collision.mjs && node --check vite.config.js && node --check scripts/prepare-assets.mjs",
     "dev": "vite",
     "predev": "node scripts/prepare-assets.mjs",
     "prebuild": "node scripts/prepare-assets.mjs",

@@ -1,9 +1,11 @@
+import {palmAngles,signedFinger,headTarget,follow,angleDelta,stepHeight,guardPalm} from './live-control.js';
+import {createRiggedPuppet} from './rigged-puppet.js';
 import {createStudent} from './student-character.js';
 import './mobile-layout.js';
 import {propMaterial} from './prop-materials.js';
 import {paintedSurface} from './painted-surfaces.js';
 import {collisionBoxes, safeLamp, nearestLamp} from './lamp-collision.js';
-import {curls,solveIK,clamp,normalizeCurl,limbPose,handPosition,pinchState} from './puppet-control.js';
+import {curls,solveIK,clamp,limbPose,handPosition,pinchState} from './puppet-control.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 const stage=document.querySelector('#stage');
@@ -55,7 +57,25 @@ for(const side of [1,-1])for(const leg of [false,true]){
  const joint=ball(.10,skin,0,0,0),tip=leg?box(.23,.14,.43,wood,0,0,0,puppet):ball(.10,skin,0,0,0);
  limbs.push({root,end,rest:end.clone(),a,b,upper,lower,joint,tip,leg,side,index:leg?(side===1?3:4):(side===1?0:1)});
 }
-const student=createStudent(puppet,limbs);
+const classicGroup=new THREE.Group();
+for(const child of [...puppet.children])classicGroup.add(child);
+const classicBody=box(.65,.85,.35,dark,0,1.35,0,classicGroup),classicHead=new THREE.Group();classicGroup.add(classicHead);
+ball(.42,skin,0,2.15,0,classicHead);ball(.43,dark,0,2.28,-.07,classicHead);box(.62,.2,.15,dark,0,2.4,.25,classicHead);
+for(const x of [-.16,.16]){ball(.07,iron,x,2.16,.38,classicHead);ball(.018,mat('#d7c88a'),x,2.17,.44,classicHead);}
+rod(v(0,1.7,0),v(0,1.85,0),.09,skin,classicHead);
+const classicLimbs=limbs.slice(),studentGroup=new THREE.Group();
+const studentLimbs=limbs.map(l=>{const copy={...l,end:l.end.clone()};for(const key of ['upper','lower','joint','tip']){copy[key]=l[key].clone();studentGroup.add(copy[key]);}return copy;});
+const modernStudent=createStudent(studentGroup,studentLimbs);
+const woodenGroup=new THREE.Group(),woodenLimbs=classicLimbs.map(l=>{const copy={...l,end:l.end.clone()};for(const key of ['upper','lower','joint','tip']){copy[key]=l[key].clone();woodenGroup.add(copy[key]);}return copy;});
+const woodenStudent=createStudent(woodenGroup,woodenLimbs,'wooden-puppet.glb');
+const riggedGroup=new THREE.Group(),riggedStudent=createRiggedPuppet(riggedGroup);
+let student=modernStudent,activePuppet=studentGroup;puppet.add(activePuppet);
+const puppetChoice=document.querySelector('#puppet-choice');
+puppetChoice.addEventListener('change',()=>{
+ const classic=puppetChoice.value==='classic',wooden=puppetChoice.value==='wooden',rigged=puppetChoice.value==='rigged';puppet.remove(activePuppet);activePuppet=rigged?riggedGroup:classic?classicGroup:wooden?woodenGroup:studentGroup;puppet.add(activePuppet);
+ limbs.splice(0,limbs.length,...(classic?classicLimbs:wooden?woodenLimbs:studentLimbs));student=rigged?riggedStudent:classic?{body:classicBody,head:classicHead}:wooden?woodenStudent:modernStudent;
+});
+limbs.splice(0,limbs.length,...studentLimbs);
 function segment(mesh,a,b){mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.scale.y=a.distanceTo(b)/mesh.geometry.parameters.height;mesh.quaternion.setFromUnitVectors(v(0,1,0),b.clone().sub(a).normalize());}
 // Pendant light: visible bulb and a real shadow-casting spotlight.
 lamp.position.set(1.3,4.6,.3);const shade=new THREE.Mesh(new THREE.ConeGeometry(.6,.35,32,1,true),Object.assign(propMaterial('enamel','#61745a'),{side:THREE.DoubleSide}));lamp.add(shade);const bulb=ball(.12,new THREE.MeshStandardMaterial({color:'#fff0bb',emissive:'#ffd17a',emissiveIntensity:4}),0,-.15,0,lamp);const light=new THREE.SpotLight('#ffce86',65,15,.64,.65,1.5);light.position.set(0,-.23,0);lamp.add(light);light.target.position.set(1.1,0,.2);scene.add(light.target);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.0005;
@@ -108,25 +128,39 @@ window.addEventListener('handtracking',({detail})=>{
  lampDriver.target.copy(target);lampDriver.seen=performance.now();
 });
 const puppetHome=puppet.position.clone();
-const driver={target:puppetHome.clone(),seen:-Infinity,raw:[0,0,0,0,0],values:[0,0,0,0,0],recoverUntil:0};
+const driver={target:puppetHome.clone(),seen:-Infinity,raw:[0,0,0,0,0],values:[0,0,0,0,0,0,0,0,0],recoverUntil:0};
 const names=['拇指','食指','中指','无名指','小指'];
 const ranges=Array(5).fill(null);
-let calibration=null,sensitivity=1;
+let calibration=null,sensitivity=1,palmBaseline=null,palmRaw=null,headSeen=-Infinity;
+const liveSettings={limbRange:1,headGain:1,headRange:1};
+const liveDiagnostics={limited:false,target:[],renderMs:0,frameMs:0};
 let simulation=false;
-let rightHandOnly=false;
 
-const simulated=[0,0,0,0,0];
+const simulated=[0,0,0,0,0,0,0,0,0];
 const simulationPanel=document.createElement('details');
 simulationPanel.innerHTML='<summary>模拟动作控制</summary><label><input id="simulate" type="checkbox">启用模拟模式（暂停左手操偶输入）</label><p id="input-mode">真实输入模式</p>'+names.map((name,i)=>`<label style="display:block">${name} → ${['左手','右手','身体提起','左脚','右脚'][i]} <input id="sim-${i}" aria-label="模拟${name}" type="range" min="0" max="1" step="0.01" value="0"><output id="sim-value-${i}">0.00</output></label>`).join('');
+simulationPanel.innerHTML+=['左脚抬高','右脚抬高','头部左右','头部俯仰'].map((name,j)=>`<label style="display:block">${name}<input id="sim-${j+5}" aria-label="${name}" type="range" min="${j<2?0:-1}" max="1" step="0.01" value="0"></label>`).join('');
+for(let i=0;i<9;i++){const el=simulationPanel.querySelector(`#sim-${i}`);if(i<5&&i!==2)el.min=-1;if(i>=5)el.oninput=e=>simulated[i]=Number(e.target.value);}
 document.querySelector('aside').append(simulationPanel);
 document.querySelector('#simulate').onchange=e=>{simulation=e.target.checked;driver.recoverUntil=performance.now()+300;document.querySelector('#input-mode').textContent=simulation?'模拟模式 · 左手不驱动木偶，右手仍可提灯':'真实输入模式';if(calibration)calibration.last=0;};
 names.forEach((_,i)=>document.querySelector(`#sim-${i}`).oninput=e=>{simulated[i]=Number(e.target.value);document.querySelector(`#sim-value-${i}`).value=simulated[i].toFixed(2);});
-function actionInput(idle){return simulation?simulated:driver.raw.map((raw,i)=>idle?0:normalizeCurl(raw,ranges[i],sensitivity));}
+function actionInput(idle){
+ if(simulation)return simulated;
+ liveDiagnostics.limited=false;
+ const fingers=driver.raw.map((raw,i)=>{if(idle)return 0;const mapped=signedFinger(raw,ranges[i],sensitivity);liveDiagnostics.limited ||=mapped.limited;return (i===2?Math.max(0,mapped.value):mapped.value)*liveSettings.limbRange;});
+ if(palmRaw&&palmBaseline)liveDiagnostics.limited ||=Math.abs(angleDelta(palmRaw.yaw,palmBaseline.yaw)*liveSettings.headGain)>.7||Math.abs(angleDelta(palmRaw.pitch,palmBaseline.pitch)*liveSettings.headGain)>.45;
+ const head=headTarget(!idle&&performance.now()-headSeen<300?palmRaw:null,palmBaseline,liveSettings.headGain,liveSettings.headRange);
+ return [...fingers,stepHeight(fingers[3]),stepHeight(fingers[4]),...head];
+}
 
 const status=document.querySelector('#calibration-status');
 const debug=document.querySelector('#finger-debug');
+const livePanel=document.createElement('div');
+livePanel.innerHTML='<p>真人控制：先完成自然中立、舒适伸展、舒适弯曲三步校准。中立区为单侧行程的15%。</p>'+[['limbRange','四肢动作范围',.2,1],['headGain','头部灵敏度',.5,2],['headRange','头部动作范围',.2,1]].map(([key,label,min,max])=>`<label>${label}<input id="live-${key}" aria-label="${label}" type="range" min="${min}" max="${max}" step="0.05" value="1"><output>1.00</output></label>`).join('')+'<pre id="live-debug" aria-live="off"></pre><p id="render-timing"></p>';
+document.querySelector('.calibration').append(livePanel);
+for(const key of Object.keys(liveSettings))document.querySelector(`#live-${key}`).oninput=e=>{liveSettings[key]=Number(e.target.value);e.target.nextElementSibling.value=liveSettings[key].toFixed(2);};
 debug.innerHTML=names.map((name,i)=>`<div>${name} <span id="raw-${i}"></span><progress id="bar-${i}" max="1" value="0"></progress><span id="value-${i}"></span><span id="range-${i}">默认范围</span><button id="retry-${i}">单独校准</button></div>`).join('');
-function begin(indices){calibration={indices,phase:0,elapsed:0,last:0,samples:[],open:[]};status.textContent='张开左手，点击“开始本步采样”';document.querySelector('#sample').disabled=false;}
+function begin(indices){calibration={indices,phase:0,elapsed:0,last:0,samples:[],open:[],neutral:[],palms:[]};status.textContent='左手自然放松，掌心朝向舒适方向，点击开始采样';document.querySelector('#sample').disabled=false;}
 document.querySelector('#calibrate').onclick=()=>begin([0,1,2,3,4]);
 names.forEach((_,i)=>document.querySelector(`#retry-${i}`).onclick=()=>begin([i]));
 document.querySelector('#sample').onclick=()=>{if(calibration){calibration.running=true;calibration.last=0;document.querySelector('#sample').disabled=true;}};
@@ -134,21 +168,27 @@ document.querySelector('#sensitivity').oninput=e=>{sensitivity=Number(e.target.v
 document.querySelector('#sensitivity-reset').onclick=()=>{sensitivity=1;document.querySelector('#sensitivity').value=1;document.querySelector('#sensitivity-value').textContent='1.00';};
 window.addEventListener('handtracking',({detail})=>{
  if(!detail.active){simulation=false;document.querySelector('#simulate').checked=false;driver.seen=-Infinity;driver.target.copy(puppetHome);driver.raw.fill(0);if(calibration)calibration.last=0;}
- rightHandOnly=!!(detail.active && detail.right?.visible && !detail.left?.visible);
  if(simulation)return;
  const target=detail.active && detail.left?.visible?handPosition(detail.left.landmarks):null;
  if(!target){if(calibration)calibration.last=0;return;}
  driver.target.copy(target);
  const pts=detail.left.landmarks,now=performance.now();if(now-driver.seen>250)driver.recoverUntil=now+300;driver.raw=curls(pts);driver.seen=now;
+ const candidate=palmAngles(detail.left.worldLandmarks||pts);
+ palmRaw=guardPalm(candidate,palmRaw,(now-headSeen)/1000);if(palmRaw)headSeen=now;
  if(calibration?.running){
   const c=calibration;
   if(driver.raw.every(Number.isFinite)){
    if(c.last && now-c.last<250)c.elapsed+=now-c.last;
-   c.last=now;c.samples.push(driver.raw.slice());
+   c.last=now;c.samples.push(driver.raw.slice());if(palmRaw)c.palms.push({...palmRaw});
    if(c.elapsed>=2000){
     const mean=driver.raw.map((_,i)=>c.samples.reduce((sum,x)=>sum+x[i],0)/c.samples.length);
-    if(c.phase===0){c.open=mean;c.phase=1;c.elapsed=0;c.last=0;c.samples=[];c.running=false;document.querySelector('#sample').disabled=false;status.textContent='自然弯曲五指即可，可联动，无需握紧拳；点击开始本步采样';}
-    else{c.indices.forEach(i=>{const valid=mean[i]-c.open[i]>=.04;if(valid)ranges[i]={open:c.open[i],closed:mean[i]};document.querySelector(`#range-${i}`).textContent=valid?'校准有效':'跨度不足，请单独重试'+(ranges[i]?'（保留原校准）':'');});calibration=null;status.textContent='采样完成，请查看各指结果；不足的手指可单独重试';}
+    if(c.phase===0){
+     if(c.palms.length<10){c.elapsed=0;c.samples=[];c.palms=[];status.textContent='掌面识别不足，请让腕部和掌指关节完整入镜后重试';return;}
+     c.neutral=mean;const first=c.palms[0];palmBaseline={yaw:first.yaw+c.palms.reduce((sum,p)=>sum+angleDelta(p.yaw,first.yaw),0)/c.palms.length,pitch:c.palms.reduce((sum,p)=>sum+p.pitch,0)/c.palms.length};
+     c.phase=1;status.textContent='舒适伸展五指，不必极限伸直；点击开始采样';
+    }else if(c.phase===1){c.open=mean;c.phase=2;status.textContent='舒适弯曲五指，不必握紧；点击开始采样';}
+    else{c.indices.forEach(i=>{const valid=c.neutral[i]-c.open[i]>=.025&&mean[i]-c.neutral[i]>=.025;if(valid)ranges[i]={open:c.open[i],neutral:c.neutral[i],closed:mean[i]};document.querySelector(`#range-${i}`).textContent=valid?'三点校准有效':'中立两侧跨度不足，请单独重试';});calibration=null;status.textContent='校准完成；自然中立保持不动，伸展后摆，弯曲前摆';}
+    if(calibration){c.elapsed=0;c.last=0;c.samples=[];c.palms=[];c.running=false;document.querySelector('#sample').disabled=false;}
    }
   }else c.last=0;
  }
@@ -156,18 +196,41 @@ window.addEventListener('handtracking',({detail})=>{
 });
 function applyPose(){
  const lift=driver.values[2]*.55;
- for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
+ const headSupported=student!==riggedStudent||!!student.headBone;
+ for(const i of [7,8]){const input=document.querySelector(`#sim-${i}`);input.disabled=!headSupported;input.title=headSupported?'围绕颈部旋转':(student.loaded?'缺少 Head/Neck 骨骼，不支持独立头部':'等待骨骼模型加载');}
 
- student.update?.();
+ for(const limb of limbs){const pose=limbPose(limb.side,limb.leg,driver.values[limb.index],lift,driver.values[limb.side===1?5:6]);limb.end.copy(pose.end);segment(limb.upper,pose.root,pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);}
+
+ student.update?.(driver.values);
+ if(student!==riggedStudent){
+ const h=student.head;
+ if(!h.userData.neckPivot){const pivot=new THREE.Group();pivot.position.set(0,1.78,0);h.parent.add(pivot);pivot.attach(h);h.userData.neckPivot=pivot;}
+ const pivot=h.userData.neckPivot;pivot.position.y=1.78+lift;pivot.rotation.set(driver.values[8]*.45,driver.values[7]*.7,0,'YXZ');
+ }
+ if(student!==riggedStudent){
+ const feet=student.footObjects||limbs.filter(l=>l.leg).map(l=>l.tip);
+ for(let iteration=0;iteration<2;iteration++){
+ activePuppet.updateWorldMatrix(true,true);
+ for(let i=0;i<feet.length;i++){
+ const box=new THREE.Box3().setFromObject(feet[i],true),floor=activePuppet.localToWorld(v(0,.06+lift,0)).y;
+ const delta=Math.max(0,floor-box.min.y);
+ if(delta>1e-6){const limb=student.footObjects?limbs.find(l=>l.leg&&Math.sign(feet[i].position.x)===l.side):limbs.filter(l=>l.leg)[i];
+ const pose=solveIK(limb.root.clone().add(v(0,lift,0)),limb.end.clone().add(v(0,delta,0)),limb.a,limb.b,v(limb.side*.65,.25,1));
+ limb.end.copy(pose.end);segment(limb.upper,limb.root.clone().add(v(0,lift,0)),pose.joint);segment(limb.lower,pose.joint,pose.end);limb.joint.position.copy(pose.joint);limb.tip.position.copy(pose.end);
+ }
+ }
+ student.update?.(driver.values);
+ }
+ }
  // Move the rigid torso and head together with the middle-finger lift.
- for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+lift;}
+ for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+(child.userData.neckPivot?0:lift);}
 }
 const books=[new THREE.Box3(v(2.1-.63,-1,-1.65-.63),v(3.9+.63,4.9,-.65+.63))];
-function currentBoxes(){return [...collisionBoxes(puppet),...books];}
+function currentBoxes(){return [...collisionBoxes(activePuppet),...books];}
 function resolveCollision(next,dt,previousPosition,previousValues){
  const proposed=puppet.position.clone(),values=driver.values.slice(),origin=lamp.position.clone();
  // A pre-existing overlap is repaired once; ordinary frames obey the speed budget.
- puppet.position.copy(previousPosition);driver.values.splice(0,5,...previousValues);applyPose();
+ puppet.position.copy(previousPosition);driver.values.splice(0,9,...previousValues);applyPose();
  const recovering=!safeLamp(origin,currentBoxes());
  const budget=Math.max(.001,dt*3);
  if(next.distanceTo(origin)>budget){const delta=next.clone().sub(origin).setLength(budget);next.copy(origin).add(delta);}
@@ -175,36 +238,42 @@ function resolveCollision(next,dt,previousPosition,previousValues){
  for(let step=0;step<=12;step++){
   const fraction=step===12?0:Math.pow(.5,step);
   puppet.position.copy(previousPosition).lerp(proposed,fraction);
-  driver.values.splice(0,5,...values.map((value,i)=>previousValues[i]+(value-previousValues[i])*fraction));applyPose();
+  driver.values.splice(0,9,...values.map((value,i)=>previousValues[i]+(value-previousValues[i])*fraction));applyPose();
   const boxes=currentBoxes(),candidate=nearestLamp(next,boxes);
   if(candidate&&(recovering||candidate.distanceTo(origin)<=budget)) {accepted=candidate;break;}
  }
  if(!accepted){
-  puppet.position.copy(previousPosition);driver.values.splice(0,5,...previousValues);applyPose();
+  puppet.position.copy(previousPosition);driver.values.splice(0,9,...previousValues);applyPose();
   const boxes=currentBoxes();accepted=safeLamp(origin,boxes)?origin:nearestLamp(origin,boxes);
  }
  if(accepted)lamp.position.copy(accepted);
 }
-let lastFrame=performance.now();
+let lastFrame=performance.now(),lastFrameMeasured=lastFrame;
 renderer.setAnimationLoop(()=>{
  const now=performance.now(),dt=Math.min((now-lastFrame)/1000,.1);lastFrame=now;
  const lampLost=now-lampDriver.seen>600;
  const desired=lampDriver.owner==='simulation'?lampDriver.target:lampLost?lampHome:lampDriver.target;
  const next=lamp.position.clone().lerp(desired,1-Math.exp(-dt*(lampLost?1.8:10)));
- const idle=!simulation && now-driver.seen>700,alpha=rightHandOnly && !simulation?0:1-Math.exp(-dt*(idle?1.6:(now<driver.recoverUntil?8:18)));
+ const idle=!simulation && now-driver.seen>300,alpha=1-Math.exp(-dt*(idle?1.6:(now<driver.recoverUntil?8:18)));
  const previousPosition=puppet.position.clone(),previousValues=driver.values.slice();
  puppet.position.lerp(simulation||idle?puppetHome:driver.target,alpha);
  const input=actionInput(idle);
- for(let i=0;i<5;i++){const value=input[i];driver.values[i]+=(value-driver.values[i])*alpha;}
+ for(let i=0;i<9;i++){const value=input[i]||0;driver.values[i]=simulation?driver.values[i]+(value-driver.values[i])*alpha:follow(driver.values[i],value,dt,i>=7?1.5:3,now<driver.recoverUntil?5:12);}
+ liveDiagnostics.target=input.slice();const proposedValues=driver.values.slice();
  applyPose();
  resolveCollision(next,dt,previousPosition,previousValues);
  lampStatus.textContent=lampDriver.owner==='simulation'?'模拟控制':!lampDriver.active?'摄像头未开启':lampLost?'等待右手':lampDriver.pinching?'吊线伸缩':'提灯移动';
  segment(cable,v(lamp.position.x,6.2,lamp.position.z),lamp.position.clone().add(v(0,.175,0)));
  light.target.position.set(lamp.position.x,.065,lamp.position.z);
  names.forEach((_,i)=>{const value=input[i];document.querySelector(`#raw-${i}`).textContent=simulation?'模拟输入':`原始 ${driver.raw[i].toFixed(3)}`;document.querySelector(`#bar-${i}`).value=idle?0:value;document.querySelector(`#value-${i}`).textContent=idle?'未追踪':value.toFixed(2);});
- if(calibration?.running)status.textContent=(calibration.phase?'自然弯指采样':'张手采样')+`：剩余 ${Math.max(0,(2000-calibration.elapsed)/1000).toFixed(1)} 秒`+(now-driver.seen>250?' · 左手丢失，暂停':'');
- controls.update();renderer.render(scene,camera);
+ if(calibration?.running)status.textContent=(['自然中立采样','舒适伸展采样','舒适弯曲采样'][calibration.phase])+`：剩余 ${Math.max(0,(2000-calibration.elapsed)/1000).toFixed(1)} 秒`+(now-driver.seen>250?' · 左手丢失，暂停':'');
+ const blocked=driver.values.some((value,i)=>Math.abs(value-proposedValues[i])>.001);
+ document.querySelector('#live-debug').textContent=`状态：${simulation?'模拟':idle?'识别不足 / 丢手回中':!ranges.every(Boolean)?'需完成五指校准':!palmRaw?'掌面退化 / 头部回中':blocked?'碰撞阻挡':liveDiagnostics.limited?'映射限幅':'正常'}\n识别：${idle?'丢失':palmRaw?'有效':'掌面退化'} · 映射限幅：${liveDiagnostics.limited} · 碰撞阻挡：${blocked}\n掌面原始 yaw/pitch：${palmRaw?`${palmRaw.yaw.toFixed(2)} / ${palmRaw.pitch.toFixed(2)}`:'无效'}\n目标：${input.map(x=>x.toFixed(2)).join(' ')}\n实际：${driver.values.map(x=>x.toFixed(2)).join(' ')}`;
+ controls.update();const renderStart=performance.now();renderer.render(scene,camera);liveDiagnostics.renderMs=performance.now()-renderStart;liveDiagnostics.frameMs=now-lastFrameMeasured;lastFrameMeasured=now;
+ document.querySelector('#render-timing').textContent=`渲染提交 ${liveDiagnostics.renderMs.toFixed(1)} ms · 帧间隔 ${liveDiagnostics.frameMs.toFixed(1)} ms（非 GPU 完成时间）`;
+
 });
-window.theatre={scene,camera,renderer,room,props,puppet,lamp,limbs,driver,light,lampDriver,cable};
+window.theatre={get activeCharacter(){return student;},get activePuppet(){return activePuppet;},liveDiagnostics,liveSettings,scene,camera,renderer,room,props,puppet,lamp,limbs,driver,light,lampDriver,cable};
 } catch(error){const e=document.querySelector('#error');e.hidden=false;e.textContent='场景无法启动，请确认浏览器已开启硬件加速。'+error.message;console.error(error);}
+
 

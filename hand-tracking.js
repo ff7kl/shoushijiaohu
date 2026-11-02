@@ -13,6 +13,7 @@ const mirrored=true;
 video.style.transform=canvas.style.transform='scaleX(-1)';
 function assignSide(label){return label==='Left'?'left':'right';}
 let previousUpdate=0;
+const inferenceSamples=[];
 let model, stream, generation=0, frame=0, lastVideoTime=-1, busy=false;
 function publish(left=emptyHand(), right=emptyHand()) {
   tracking = {left, right, timestamp:performance.now(), active:!!stream};
@@ -53,7 +54,10 @@ function loop(token) {
       const started=performance.now();
       const result=model.detectForVideo(video,started);
       const inference=performance.now()-started;
-      document.querySelector('#tracking-timing').textContent=`推理 ${inference.toFixed(1)} ms · 更新间隔 ${previousUpdate?(started-previousUpdate).toFixed(1):'—'} ms`;
+      inferenceSamples.push(inference);if(inferenceSamples.length>120)inferenceSamples.shift();
+      const sorted=inferenceSamples.slice().sort((a,b)=>a-b);
+      window.handPerformance={inferenceMs:inference,p50:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.95))],updateMs:previousUpdate?started-previousUpdate:null,samples:(window.handPerformance?.samples||0)+1};
+      document.querySelector('#tracking-timing').textContent=`推理 ${inference.toFixed(1)} ms · P95 ${window.handPerformance.p95.toFixed(1)} ms · 更新间隔 ${previousUpdate?(started-previousUpdate).toFixed(1):'—'} ms`;
       previousUpdate=started;
       const hands={left:emptyHand(),right:emptyHand()};
       result.landmarks.forEach((points,i)=>{
@@ -62,7 +66,7 @@ function loop(token) {
         if(label!=='Left' && label!=='Right') return;
         const side=assignSide(label);
         if(hands[side].visible) return;
-        hands[side]={visible:true,landmarks:points};
+        hands[side]={visible:true,landmarks:points,worldLandmarks:result.worldLandmarks?.[i]};
       });
       publish(hands.left,hands.right); draw();
       document.querySelector('#mapping-debug').textContent='原始标签 → 最终身份：'+(result.handedness.map(h=>{const label=h[0]?.categoryName;return label+' → '+(assignSide(label)==='left'?'真实左手（木偶）':'真实右手（悬灯）');}).join('；')||'无')+' · 固定身份映射';
