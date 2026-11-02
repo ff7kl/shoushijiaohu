@@ -26,7 +26,7 @@ function updateDiagnostic(){
  const age=metrics.last?((now-metrics.last)/1000).toFixed(1)+'秒前':'无';
  liveInfo.textContent=video.videoWidth+'×'+video.videoHeight+' · ready '+video.readyState+' · 轨道 '+(track?.readyState||'无')+(track?.muted?' / muted':'')+' · 模型 '+metrics.model+' · 推理 '+metrics.count+' 次 / '+age+' · 手 '+metrics.hands+' · '+metrics.ms.toFixed(1)+'ms · 视频 '+video.currentTime.toFixed(2)+'s';
  if(!stream)return;
- status.textContent=metrics.error?'推理失败：'+metrics.error+'；请重启摄像头':metrics.model!=='就绪'?'A：模型'+metrics.model:document.hidden?'后台暂停，返回后恢复':now-metrics.videoChanged>3000?'B：视频帧停滞，请重新开启摄像头':!metrics.last||now-metrics.last>3000?'B：等待有效帧或推理停滞，请重启摄像头':!metrics.hands?'C：推理正常，未检测到手。确认前置摄像头、光线充足，完整手掌靠近镜头':!metrics.drawn?'D：已检测到手，骨架绘制异常':!window.theatre?.liveCalibration?.baseline?'E：骨架正常，请完成自然中立校准':'骨架正常，已校准';
+ status.textContent=metrics.error?'推理失败：'+metrics.error+'；请重启摄像头':metrics.model!=='就绪'?'A：模型'+metrics.model:document.hidden?'后台暂停，返回后恢复':now-metrics.videoChanged>3000?'B：视频帧停滞，请重新开启摄像头':!metrics.last||now-metrics.last>3000?'B：等待有效帧或推理停滞，请重启摄像头':!metrics.hands?'C：推理正常，未检测到手。确认前置摄像头、光线充足，完整手掌靠近镜头':!metrics.drawn?'D：已检测到手，骨架绘制异常':!window.theatre?.liveCalibration?.ranges?.every(Boolean)?'E：骨架正常，请完成三步五指校准（见下方进度）':!tracking.left.visible?'已校准；请将左手完整入镜控制木偶':'骨架正常，五指已校准';
 }
 setInterval(updateDiagnostic,500);
 let modelPromise,permissionPending=false;

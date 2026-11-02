@@ -1,11 +1,14 @@
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createStudent as fallback} from './student-character-fallback.js';
 import {createStudentPainter} from './student-materials.js';
 import {denimLeg} from './old-denim.js';
 export function createStudent(puppet,limbs,model='student-v7.glb'){
- const student=fallback(puppet,limbs),parts=[];
+ // Keep only empty control objects until the selected GLB is ready.
+ puppet.clear();
+ const body=new T.Group(),head=new T.Group();puppet.add(body,head);
+ for(const limb of limbs)limb.tip=new T.Group();
+ const student={body,head,loaded:false,modelAsset:model},parts=[];
  student.update=()=>{for(const p of parts){if(p.limb){const l=p.limb,a=p.lower?l.joint.position:l.root.clone().add(new T.Vector3(0,(student.body.position.y-student.body.userData.baseY)||0,0)),b=p.lower?l.end:l.joint.position;const d=b.clone().sub(a);p.group.position.copy(a).add(b).multiplyScalar(.5);p.group.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize());p.group.scale.set(1,d.length()/p.length,1);}else if(p.tip)p.group.position.copy(p.tip.end);}};
  new GLTFLoader().load(import.meta.env.BASE_URL+'models/'+model,gltf=>{
   const old=[...puppet.children];for(const o of old)puppet.remove(o);
@@ -86,7 +89,7 @@ export function createStudent(puppet,limbs,model='student-v7.glb'){
   }
   student.footObjects=parts.filter(p=>p.tip?.leg).map(p=>p.group);
   student.loaded=true;student.update();
- },undefined,error=>{student.loadError=error.message || '模型请求失败';console.error(error);});
+ },undefined,error=>{student.loadError=error.message || '模型请求失败：'+model;console.error(error);});
  return student;
 }
 

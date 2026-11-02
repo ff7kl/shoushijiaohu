@@ -75,7 +75,10 @@ puppetChoice.addEventListener('change',()=>{
  const classic=puppetChoice.value==='classic',wooden=puppetChoice.value==='wooden',rigged=puppetChoice.value==='rigged';puppet.remove(activePuppet);activePuppet=rigged?riggedGroup:classic?classicGroup:wooden?woodenGroup:studentGroup;puppet.add(activePuppet);
  limbs.splice(0,limbs.length,...(classic?classicLimbs:wooden?woodenLimbs:studentLimbs));student=rigged?riggedStudent:classic?{body:classicBody,head:classicHead}:wooden?woodenStudent:modernStudent;
 });
-limbs.splice(0,limbs.length,...studentLimbs);
+puppetChoice.dispatchEvent(new Event('change'));
+const modelStatus=document.createElement('p');modelStatus.setAttribute('role','status');puppetChoice.closest('label').after(modelStatus);
+function updateModelStatus(){const error=student.loadError||activePuppet.userData.rigError,ready=puppetChoice.value==='classic'||(student.loaded&&(student!==riggedStudent||activePuppet.userData.texturesReady));activePuppet.visible=!!ready&&!error;modelStatus.textContent=error?'模型加载失败：'+error:ready?'当前人偶：'+puppetChoice.selectedOptions[0].textContent+(student.modelAsset?' · '+student.modelAsset:''):'正在加载所选人偶…';}
+puppetChoice.addEventListener('change',updateModelStatus);setInterval(updateModelStatus,200);updateModelStatus();
 function segment(mesh,a,b){mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.scale.y=a.distanceTo(b)/mesh.geometry.parameters.height;mesh.quaternion.setFromUnitVectors(v(0,1,0),b.clone().sub(a).normalize());}
 // Pendant light: visible bulb and a real shadow-casting spotlight.
 lamp.position.set(1.3,4.6,.3);const shade=new THREE.Mesh(new THREE.ConeGeometry(.6,.35,32,1,true),Object.assign(propMaterial('enamel','#61745a'),{side:THREE.DoubleSide}));lamp.add(shade);const bulb=ball(.12,new THREE.MeshStandardMaterial({color:'#fff0bb',emissive:'#ffd17a',emissiveIntensity:4}),0,-.15,0,lamp);const light=new THREE.SpotLight('#ffce86',65,15,.64,.65,1.5);light.position.set(0,-.23,0);lamp.add(light);light.target.position.set(1.1,0,.2);scene.add(light.target);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.bias=-.0005;
@@ -158,14 +161,19 @@ function actionInput(idle){
 const status=document.querySelector('#calibration-status');
 const debug=document.querySelector('#finger-debug');
 const livePanel=document.createElement('div');
-livePanel.innerHTML='<p>真人控制：先完成自然中立、舒适伸展、舒适弯曲三步校准。中立区为单侧行程的15%。</p>'+[['limbRange','四肢动作范围',.2,1],['headGain','头部灵敏度',.5,2],['headRange','头部动作范围',.2,1]].map(([key,label,min,max])=>`<label>${label}<input id="live-${key}" aria-label="${label}" type="range" min="${min}" max="${max}" step="0.05" value="1"><output>1.00</output></label>`).join('')+'<button id="head-center">头部回中</button><pre id="live-debug" aria-live="off"></pre><p id="render-timing"></p>';
+livePanel.innerHTML='<p>真人控制：先完成自然中立、舒适伸展、舒适弯曲三步校准，再用左手五指操偶。中立区为单侧行程的15%。</p>'+[['limbRange','四肢动作范围',.2,1],['headGain','头部灵敏度',.5,2],['headRange','头部动作范围',.2,1]].map(([key,label,min,max])=>`<label>${label}<input id="live-${key}" aria-label="${label}" type="range" min="${min}" max="${max}" step="0.05" value="1"><output>1.00</output></label>`).join('')+'<button id="head-center">头部回中</button><pre id="live-debug" aria-live="off"></pre><p id="render-timing"></p>';
 document.querySelector('.calibration').append(livePanel);
 document.querySelector('#head-center').onclick=()=>{if(palmRaw&&performance.now()-headSeen<300){palmBaseline={...palmRaw};status.textContent='头部基准已更新';}else status.textContent='掌面无效，无法头部回中';};
 for(const key of Object.keys(liveSettings))document.querySelector(`#live-${key}`).oninput=e=>{liveSettings[key]=Number(e.target.value);e.target.nextElementSibling.value=liveSettings[key].toFixed(2);};
-debug.innerHTML='<p>四肢：−1 后摆 · 0 中立 · +1 前摆；中指：0～1 提身</p>'+names.map((name,i)=>`<div>${name} <span id="raw-${i}"></span><meter id="bar-${i}" aria-label="${name}有符号控制量" min="${i===2?0:-1}" max="1" low="-1" high="1" optimum="0" value="0"></meter><span id="value-${i}"></span><span id="range-${i}">未校准，请校准</span><button id="retry-${i}">单独校准</button></div>`).join('');
+debug.innerHTML='<p>四肢：−1 后摆 · 0 中立 · +1 前摆；中指：0～1 提身</p>'+names.map((name,i)=>`<div>${name} <span id="raw-${i}"></span><meter id="bar-${i}" aria-label="${name}有符号控制量" min="${i===2?0:-1}" max="1" low="-1" high="1" optimum="0" value="0"></meter><span id="value-${i}"></span><span id="range-${i}">未校准，请完成三步采样</span><button id="retry-${i}">单独校准</button></div>`).join('');
 function begin(indices){calibration={indices,phase:0,elapsed:0,last:0,samples:[],open:[],neutral:[],palms:[],headBaseline:null};status.textContent='左手自然放松，掌心朝向舒适方向，点击开始采样';document.querySelector('#sample').disabled=false;}
 document.querySelector('#calibrate').onclick=()=>begin([0,1,2,3,4]);
 names.forEach((_,i)=>document.querySelector(`#retry-${i}`).onclick=()=>begin([i]));
+const calibrationPanel=document.createElement('div');calibrationPanel.id='camera-calibration';
+document.querySelector('.camera-controls').append(calibrationPanel);
+for(const id of ['calibrate','sample','calibration-status'])calibrationPanel.append(document.getElementById(id));
+const calibrationProgress=document.createElement('p');calibrationProgress.setAttribute('role','status');calibrationPanel.append(calibrationProgress);
+setInterval(()=>{calibrationProgress.textContent=calibration?'第 '+(calibration.phase+1)+'/3 步 · '+(calibration.running?'有效采样 '+(calibration.elapsed/1000).toFixed(1)+'/2 秒；保持左手入镜':'调整手势后点击开始本步采样'):'五指校准 '+ranges.filter(Boolean).length+'/5 · '+(ranges.every(Boolean)?'可以控制四肢': '未通过的手指不输出动作');},250);
 document.querySelector('#sample').onclick=()=>{if(calibration){calibration.running=true;calibration.last=0;document.querySelector('#sample').disabled=true;}};
 document.querySelector('#sensitivity').oninput=e=>{sensitivity=Number(e.target.value);document.querySelector('#sensitivity-value').textContent=sensitivity.toFixed(2);};
 document.querySelector('#sensitivity-reset').onclick=()=>{sensitivity=1;document.querySelector('#sensitivity').value=1;document.querySelector('#sensitivity-value').textContent='1.00';};
@@ -186,14 +194,14 @@ window.addEventListener('handtracking',({detail})=>{
    if(c.elapsed>=2000){
     const mean=driver.raw.map((_,i)=>c.samples.reduce((sum,x)=>sum+x[i],0)/c.samples.length);
     if(c.phase===0){
-     if(c.indices.length===5&&c.palms.length<10){c.elapsed=0;c.samples=[];c.palms=[];status.textContent='掌面识别不足，请让腕部和掌指关节完整入镜后重试';return;}
+     // Head orientation is optional; valid finger samples must still calibrate limbs.
      c.neutral=mean;const first=c.palms[0];c.headBaseline=first?{yaw:first.yaw+c.palms.reduce((sum,p)=>sum+angleDelta(p.yaw,first.yaw),0)/c.palms.length,pitch:c.palms.reduce((sum,p)=>sum+p.pitch,0)/c.palms.length}:null;
      c.phase=1;status.textContent='舒适伸展五指，不必极限伸直；点击开始采样';
     }else if(c.phase===1){c.open=mean;c.phase=2;status.textContent='舒适弯曲五指，不必握紧；点击开始采样';}
     else{
      const result=calibrationResult(ranges,c.indices,c.open,c.neutral,mean,palmBaseline,c.headBaseline);
      result.ranges.forEach((range,i)=>ranges[i]=range);palmBaseline=result.baseline;
-     c.indices.forEach(i=>document.querySelector(`#range-${i}`).textContent=result.failed.includes(i)?(ranges[i]?'重校准失败，保留原校准':'未校准，跨度不足'):'三点校准有效');
+     c.indices.forEach(i=>document.querySelector(`#range-${i}`).textContent=result.failed.includes(i)?(ranges[i]?'重校准失败，保留原校准':'未校准，跨度不足，请重试'):'三点校准有效');
      calibration=null;status.textContent=result.failed.length?`校准部分失败：${result.failed.map(i=>names[i]).join('、')}；其他有效校准保留`:'校准完成；自然中立保持不动，伸展后摆，弯曲前摆';
     }
     if(calibration){c.elapsed=0;c.last=0;c.samples=[];c.palms=[];c.running=false;document.querySelector('#sample').disabled=false;}

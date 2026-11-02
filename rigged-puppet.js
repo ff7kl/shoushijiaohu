@@ -4,7 +4,10 @@ import {limbPose} from './puppet-control.js';
 import {addLayeredHair} from './rigged-hair.js';
 
 export function createRiggedPuppet(group){
- const loader=new T.TextureLoader(),map=loader.load(import.meta.env.BASE_URL+'textures/rigged-basecolor.png'),roughnessMap=loader.load(import.meta.env.BASE_URL+'textures/rigged-roughness.png');
+ let texturesLoaded=0;
+ const textureReady=()=>{texturesLoaded++;group.userData.texturesReady=texturesLoaded===2;};
+ const textureError=error=>{group.userData.rigError='骨骼贴图加载失败：'+(error?.message||error?.target?.src||'网络或解码错误');};
+ const loader=new T.TextureLoader(),map=loader.load(import.meta.env.BASE_URL+'textures/rigged-basecolor.png',textureReady,undefined,textureError),roughnessMap=loader.load(import.meta.env.BASE_URL+'textures/rigged-roughness.png',textureReady,undefined,textureError);
  map.colorSpace=T.SRGBColorSpace;map.flipY=roughnessMap.flipY=false;map.anisotropy=4;
  const material=new T.MeshStandardMaterial({map,roughnessMap,roughness:1,metalness:0});
  const body=new T.Group(),head=new T.Group();group.add(body,head);
