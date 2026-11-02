@@ -54,3 +54,6 @@ header{height:64px;padding:8px 24px}.mark{font-size:28px}h1{font-size:22px}heade
  .workspace>footer button{flex:1;min-height:44px;padding:6px 4px;font-size:12px;margin:0}
  button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 }
+
+#puppet-choice{color-scheme:dark;background:#080b0a;color:#fff;border:1px solid #495346;font:inherit;padding:6px 8px;border-radius:3px}
+#puppet-choice option{background:#080b0a;color:#fff}
