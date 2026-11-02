@@ -230,7 +230,7 @@ function applyPose(){
  }
  }
  // Move the rigid torso and head together with the middle-finger lift.
- for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;child.position.y=child.userData.baseY+(child.userData.neckPivot?0:lift);}
+ for(const child of [student.body,student.head]){child.userData.baseY??=child.position.y;if(!child.userData.neckPivot)child.position.y=child.userData.baseY+lift;}
 }
 const books=[new THREE.Box3(v(2.1-.63,-1,-1.65-.63),v(3.9+.63,4.9,-.65+.63))];
 function currentBoxes(){return [...collisionBoxes(activePuppet),...books];}
