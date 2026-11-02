@@ -35,3 +35,18 @@ export function guardPalm(current,previous,elapsed){
  if(previous&&elapsed<.3&&(Math.abs(angleDelta(current.yaw,previous.yaw))>1.2||Math.abs(angleDelta(current.pitch,previous.pitch))>.9))return null;
  return current;
 }
+
+export function updatePalm(state,candidate,now){
+ state.current=null;
+ if(!candidate)return null;
+ const gap=now-(state.candidateAt??-Infinity);
+ state.candidateAt=now;
+ const accepted=guardPalm(candidate,state.lastValid,gap>1000?Infinity:0);
+ if(accepted){state.lastValid={...accepted};state.validAt=now;state.current=state.lastValid;}
+ return state.current;
+}
+export function calibrationResult(ranges,indices,open,neutral,closed,baseline,newBaseline=null){
+ const next=ranges.slice(),failed=[];
+ for(const i of indices){if([open[i],neutral[i],closed[i]].every(Number.isFinite)&&neutral[i]-open[i]>=.025&&closed[i]-neutral[i]>=.025)next[i]={open:open[i],neutral:neutral[i],closed:closed[i]};else failed.push(i);}
+ return {ranges:next,failed,baseline:indices.length===5&&newBaseline?{...newBaseline}:baseline};
+}

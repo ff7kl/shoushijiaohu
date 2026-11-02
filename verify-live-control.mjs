@@ -19,5 +19,17 @@ const head=await page.evaluate(()=>({target:window.theatre.liveDiagnostics.targe
 await page.evaluate(()=>{clearInterval(window.fakeTimer);window.sendFake(null,true);});await page.waitForTimeout(1700);
 const lost=await page.evaluate(()=>window.theatre.driver.values.slice());assert(lost.every(x=>Math.abs(x)<.02));
 await page.evaluate(()=>window.sendFake([.05,1.5,.8,.05,1.5],true));await page.waitForTimeout(50);const reentry=await page.evaluate(()=>window.theatre.driver.values.slice());assert(reentry.every((x,i)=>Math.abs(x-lost[i])<.3));
+const baselineBefore=await page.evaluate(()=>window.theatre.liveCalibration.baseline);
+await page.locator('details').first().locator('summary').click();
+await page.locator('#retry-1').click();
+for(const angle of [.8,.8,.8]){await page.locator('#sample').click();await page.evaluate(angle=>{window.fakeTimer=setInterval(()=>window.sendFake(Array(5).fill(angle)),25);},angle);await page.waitForTimeout(2300);await page.evaluate(()=>clearInterval(window.fakeTimer));}
+assert.deepEqual(await page.evaluate(()=>window.theatre.liveCalibration.baseline),baselineBefore);
+assert((await page.locator('#calibration-status').textContent()).includes('食指'));
+assert((await page.locator('#range-1').textContent()).includes('保留原校准'));
+await page.evaluate(()=>{window.testYaw=0;window.testPitch=0;window.sendFake(Array(5).fill(.8));});
+const prior=await page.evaluate(()=>window.theatre.liveCalibration.palmState);
+await page.evaluate(()=>{window.testYaw=3;window.fakeTimer=setInterval(()=>window.sendFake(Array(5).fill(.8)),25);});await page.waitForTimeout(600);await page.evaluate(()=>clearInterval(window.fakeTimer));
+const rejected=await page.evaluate(()=>window.theatre.liveCalibration.palmState);assert.equal(rejected.current,null);assert.equal(rejected.validAt,prior.validAt);assert.deepEqual(rejected.lastValid,prior.lastValid);
+await page.evaluate(()=>{window.testYaw=0;window.sendFake(Array(5).fill(.8));});assert(await page.evaluate(()=>!!window.theatre.liveCalibration.palmState.current));
 const timing=await page.evaluate(async()=>{const samples=[];for(let i=0;i<90;i++){await new Promise(requestAnimationFrame);samples.push({...window.theatre.liveDiagnostics});}const stats=key=>{const v=samples.map(x=>x[key]).sort((a,b)=>a-b);return {p50:v[45],p95:v[85]};};return {renderSubmitMs:stats('renderMs'),frameMs:stats('frameMs'),samples:samples.length};});
 await page.screenshot({path:'screenshots/live-control-debug.png'});writeFileSync('screenshots/live-control-results.json',JSON.stringify({kind:'synthetic landmarks, not camera',active,head,lost,reentry,timing,inference:'not measured: real camera required'},null,2));await browser.close();console.log('浏览器三步校准、独立四肢、双手事件、丢手回中、重入限速通过');
