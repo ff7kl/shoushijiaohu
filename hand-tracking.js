@@ -1,5 +1,5 @@
 import {frameReady} from './tracking-state.js';
-import {HandLandmarker} from '@mediapipe/tasks-vision';
+import {FilesetResolver, HandLandmarker} from '@mediapipe/tasks-vision';
 
 const video = document.querySelector('#camera-video');
 const canvas = document.querySelector('#hand-overlay');
@@ -117,13 +117,23 @@ function ensureModel(){
  if(model)return Promise.resolve(model);
  metrics.model='加载中';
  if(!modelPromise)modelPromise=(async()=>{
-  const worker=new Worker(new URL('mediapipe/hand-worker.js',new URL(import.meta.env.BASE_URL,location.href)));
+  const fallback=async()=>{
+   metrics.model='兼容模式加载中';
+   const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
+   const direct=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},runningMode:'VIDEO',numHands:2});
+   return {async detect(video,timestamp){const started=performance.now();const result=direct.detectForVideo(video,timestamp);return {result,inference:performance.now()-started};}};
+  };
+  let worker;
+  try{
+  if(typeof createImageBitmap!=='function')throw new Error('Video bitmap unavailable');
+  worker=new Worker(new URL('mediapipe/hand-worker.js',new URL(import.meta.env.BASE_URL,location.href)));
   let pending;
-  const request=(message,transfer=[])=>new Promise((resolve,reject)=>{pending={resolve,reject};worker.postMessage(message,transfer);});
+  const request=(message,transfer=[])=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending=null;reject(new Error('识别线程响应超时'));},message.type==='init'?20000:8000);pending={resolve:data=>{clearTimeout(timer);resolve(data);},reject:error=>{clearTimeout(timer);reject(error);}};try{worker.postMessage(message,transfer);}catch(error){pending.reject(error);pending=null;}});
   worker.onmessage=({data})=>{const task=pending;pending=null;if(data.error)task?.reject(new Error(data.error));else task?.resolve(data);};
   worker.onerror=event=>{pending?.reject(new Error(event.message||'Worker failed'));pending=null;worker.terminate();model=null;};
-  try{await request({type:'init'});}catch(error){worker.terminate();throw error;}
-  model={async detect(video,timestamp){const bitmap=await createImageBitmap(video);try{return await request({type:'frame',bitmap,timestamp},[bitmap]);}finally{bitmap.close();}}};
+  await request({type:'init'});
+  model={async detect(video,timestamp){let bitmap;try{bitmap=await createImageBitmap(video);return await request({type:'frame',bitmap,timestamp},[bitmap]);}catch(error){worker.terminate();model=await fallback();return model.detect(video,timestamp);}finally{bitmap?.close();}}};
+  }catch(error){worker?.terminate();model=await fallback();}
   metrics.model='就绪';return model;
  })().finally(()=>{modelPromise=null;});
  return modelPromise;
@@ -150,7 +160,7 @@ startButton.onclick=async()=>{
  showStep('视频启动');status.textContent='权限已获得，正在启动视频';
  try{await video.play();}catch(error){if(token===generation)failure('视频启动',error);return;}
  if(token!==generation)return;
- showStep('模型加载');status.textContent='视频已启动，正在加载手部模型';
+ showStep('模型加载');status.textContent='视频已启动，正在加载手部模型；首次可能较慢，20秒后自动尝试兼容模式';
  try{await ensureModel();}catch(error){if(token===generation)failure('模型加载',error);return;}
  if(token!==generation)return;
  canvas.width=video.videoWidth;canvas.height=video.videoHeight;
