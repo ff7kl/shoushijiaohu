@@ -27,3 +27,30 @@ header{height:64px;padding:8px 24px}.mark{font-size:28px}h1{font-size:22px}heade
 }
 
 #build-version{white-space:nowrap}#puppet-entry{display:none}@media(max-width:900px){#puppet-entry{display:block;margin:8px 12px;min-height:44px}header{flex-wrap:wrap}#build-version{font-size:11px}}
+/* Mobile controls stay in place; the theatre receives the remaining screen. */
+#mobile-puppet-picker{display:none}
+@media(max-width:900px){
+ html,body{height:100%;height:100dvh;overflow:hidden}
+ body{min-height:0}
+ header{height:42px;flex-wrap:nowrap;padding:4px 12px}
+ header p,.mark,#build-version,header .phase{display:none}
+ header h1{font-size:18px;letter-spacing:4px}
+ .workspace{flex:1;min-height:0;position:relative;overflow:hidden}
+ .workspace>.camera-panel{grid-template-columns:88px minmax(0,1fr);min-height:78px;padding:6px 12px;gap:10px}
+ .workspace>.camera-panel .camera-preview{width:88px;height:66px;aspect-ratio:4/3}
+ .workspace>.camera-panel .camera-controls{font-size:12px}
+ .camera-controls>p,.camera-controls>small,#tracking-live,#camera-calibration,#camera-diagnostics{display:none}
+ .camera-controls>#tracking-status{display:block;max-height:32px;overflow:auto;font-size:11px;margin:3px 0}
+ .workspace>.camera-panel .camera-controls button{min-height:44px;font-size:12px;padding:8px}
+ #puppet-entry{flex:none;min-height:44px;margin:0;padding:8px 12px;border-width:0 0 1px;text-align:left;font-size:14px}
+ #mobile-puppet-picker:not([hidden]){display:grid;position:absolute;top:122px;left:12px;right:12px;z-index:10;grid-template-columns:1fr 1fr;padding:8px;gap:8px;background:#151c19;border:1px solid #71806b}
+ #mobile-puppet-picker button{margin:0;min-height:48px;font-size:16px;touch-action:manipulation}
+ #stage{height:auto;min-height:0;flex:1;overflow:hidden}
+ .caption{display:none}
+ .workspace>aside{display:none}
+ .workspace>footer{flex:none;min-height:56px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));display:block}
+ footer>p,#wide-view,#full{display:none}
+ .workspace>footer>div{display:flex;flex-wrap:nowrap;gap:6px}
+ .workspace>footer button{flex:1;min-height:44px;padding:6px 4px;font-size:12px;margin:0}
+ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+}
