@@ -20,7 +20,7 @@ await page.evaluate(()=>{clearInterval(window.fakeTimer);window.sendFake(null,tr
 const lost=await page.evaluate(()=>window.theatre.driver.values.slice());assert(lost.every(x=>Math.abs(x)<.02));
 await page.evaluate(()=>window.sendFake([.05,1.5,.8,.05,1.5],true));await page.waitForTimeout(50);const reentry=await page.evaluate(()=>window.theatre.driver.values.slice());assert(reentry.every((x,i)=>Math.abs(x-lost[i])<.3));
 const baselineBefore=await page.evaluate(()=>window.theatre.liveCalibration.baseline);
-await page.locator('details').first().locator('summary').click();
+await page.locator('summary').filter({hasText:'五指控制与调试'}).click();
 await page.locator('#retry-1').click();
 for(const angle of [.8,.8,.8]){await page.locator('#sample').click();await page.evaluate(angle=>{window.fakeTimer=setInterval(()=>window.sendFake(Array(5).fill(angle)),25);},angle);await page.waitForTimeout(2300);await page.evaluate(()=>clearInterval(window.fakeTimer));}
 assert.deepEqual(await page.evaluate(()=>window.theatre.liveCalibration.baseline),baselineBefore);

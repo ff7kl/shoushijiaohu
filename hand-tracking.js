@@ -14,6 +14,7 @@ video.style.transform=canvas.style.transform='scaleX(-1)';
 function assignSide(label){return label==='Left'?'left':'right';}
 let previousUpdate=0;
 const inferenceSamples=[];
+let modelPromise,permissionPending=false;
 let model, stream, generation=0, frame=0, lastVideoTime=-1, busy=false;
 function publish(left=emptyHand(), right=emptyHand()) {
   tracking = {left, right, timestamp:performance.now(), active:!!stream};
@@ -24,9 +25,9 @@ function stop(message='未开启') {
   generation++;
   cancelAnimationFrame(frame);
   stream?.getTracks().forEach(track=>track.stop());
-  stream=null; video.srcObject=null; lastVideoTime=-1;
+  stream=null; video.pause();video.srcObject=null; lastVideoTime=-1;previousUpdate=0;inferenceSamples.length=0;
   clear(); status.textContent=message;
-  startButton.disabled=false; stopButton.disabled=true;
+  startButton.disabled=permissionPending; stopButton.disabled=true;
 }
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -73,40 +74,64 @@ function loop(token) {
       document.querySelector('#left-status').textContent='你的左手：'+(hands.left.visible?'已追踪':'未发现');
       document.querySelector('#right-status').textContent='你的右手：'+(hands.right.visible?'已追踪':'未发现');
       status.textContent=hands.left.visible||hands.right.visible?'已追踪':'正在寻找手';
-    } catch(error) { stop('摄像头错误：追踪失败，请重新开启。'); console.error(error); }
+    } catch(error) { failure('追踪运行',error); }
     finally {busy=false;}
   }
   if(token===generation && stream) frame=requestAnimationFrame(()=>loop(token));
 }
+const officialURL='https://ff7kl.github.io/shoushijiaohu/';
+const diagnostics=document.createElement('details');diagnostics.id='camera-diagnostics';
+diagnostics.innerHTML='<summary>摄像头诊断</summary><pre id="camera-diagnostic-info" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+document.querySelector('.calibration').append(diagnostics);
+const cameraInfo={step:'等待点击',errorName:'无',explanation:''};
+function showStep(step,error=null,explanation=''){
+ cameraInfo.step=step;cameraInfo.errorName=error?.name||'无';cameraInfo.explanation=explanation;
+ const policy=document.permissionsPolicy||document.featurePolicy;
+ let allowed='未知';try{if(policy?.allowsFeature)allowed=String(policy.allowsFeature('camera'));}catch{}
+ document.querySelector('#camera-diagnostic-info').textContent=`地址：${location.origin}${location.pathname}（省略查询参数和片段）\n安全上下文：${isSecureContext}\nmediaDevices：${!!navigator.mediaDevices} · getUserMedia：${typeof navigator.mediaDevices?.getUserMedia==='function'}\n嵌入页面：${window.top!==window.self} · 策略允许camera：${allowed}\n步骤：${step}\nerror.name：${cameraInfo.errorName}\n${explanation}`;
+}
+function failure(step,error){
+ const guidance={NotAllowedError:'可能已拒绝权限或被系统/页面策略限制。请在网址旁的站点设置允许摄像头，并检查系统中该浏览器的摄像头权限，再点击重试；网页不能强制重新弹出授权框。',SecurityError:'浏览器或页面策略禁止摄像头，请检查站点权限或直接打开正式HTTPS网址。',NotFoundError:'未找到可用摄像头。',NotReadableError:'摄像头无法读取，可能被其他应用占用，请关闭占用程序后重试。',OverconstrainedError:'摄像头无法满足请求条件，请换用系统浏览器重试。',AbortError:'启动已中断，可以重新点击开启。'};
+ const embedded=/MicroMessenger|QQ\//i.test(navigator.userAgent)?' 请从右上角菜单选择“使用系统浏览器打开”。':'';
+ const explanation=(step==='模型加载'?'视频已获得权限，但手部模型加载失败；请检查网络后重试。':step==='视频启动'?'视频播放失败，请重新点击开启；也请检查浏览器的视频播放限制。':guidance[error.name]||'此浏览器未能启动摄像头，请检查权限后重试。')+embedded;
+ stop(`${step}失败（${error.name||'Error'}）：${explanation}`);showStep(`${step}失败`,error,explanation);
+}
+function ensureModel(){
+ if(model)return Promise.resolve(model);
+ if(!modelPromise)modelPromise=(async()=>{
+  const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
+  model=await HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},runningMode:'VIDEO',numHands:2});return model;
+ })().finally(()=>{modelPromise=null;});
+ return modelPromise;
+}
+showStep('等待点击');
 startButton.onclick=async()=>{
-  const token=++generation;
-  startButton.disabled=true; stopButton.disabled=false;
-  status.textContent='模型加载中';
-  try {
-    if(!model) {
-      const files=await FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}mediapipe/wasm`);
-      model=await HandLandmarker.createFromOptions(files,{
-        baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/hand_landmarker.task`},
-        runningMode:'VIDEO',numHands:2
-      });
-    }
-    if(token!==generation) return;
-    if(!navigator.mediaDevices?.getUserMedia) throw new Error('请通过 localhost 或 HTTPS 使用支持摄像头的浏览器。');
-    const acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
-    if(token!==generation) {acquired.getTracks().forEach(t=>t.stop());return;}
-    stream=acquired; video.srcObject=stream;
-    stream.getVideoTracks()[0].onended=()=>{if(token===generation) stop('摄像头错误：设备已断开，请重新开启。');};
-    await video.play();
-    if(token!==generation) return;
-    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-    clear(); status.textContent='正在寻找手'; loop(token);
-  } catch(error) {
-    if(token!==generation) return;
-    const messages={NotAllowedError:'权限被拒绝，请在浏览器中允许摄像头后重试。',NotFoundError:'没有找到摄像头，请连接设备后重试。',NotReadableError:'摄像头无法读取，可能被其他应用占用，请关闭占用程序后重试。'};
-    stop('摄像头或模型加载失败：'+(messages[error.name]||error.message)+' 点击“开启摄像头”重试。');
-  }
+ if(startButton.disabled||permissionPending)return;
+ const token=++generation;startButton.disabled=true;stopButton.disabled=false;
+ showStep('按钮点击');
+ if(!isSecureContext){const error=new DOMException('需要HTTPS','SecurityError');stop(`当前地址不安全，请使用正式HTTPS网址：${officialURL}`);showStep('环境检查失败',error,`HTTP局域网IP不能申请手机摄像头。请使用 ${officialURL}`);return;}
+ if(!navigator.mediaDevices?.getUserMedia){failure('申请权限',new DOMException('浏览器缺少摄像头接口','NotSupportedError'));return;}
+ const policy=document.permissionsPolicy||document.featurePolicy;
+ if(policy?.allowsFeature&&!policy.allowsFeature('camera')){failure('申请权限',new DOMException('当前嵌入策略禁止摄像头','SecurityError'));return;}
+ let acquired;
+ showStep('申请权限');status.textContent='正在申请摄像头权限，请查看浏览器提示';
+ permissionPending=true;
+ try{acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'user'},width:{ideal:640},height:{ideal:480}},audio:false});}
+ catch(error){if(token===generation)failure('申请权限',error);return;}
+ finally{permissionPending=false;if(token!==generation)startButton.disabled=false;}
+ if(token!==generation){acquired.getTracks().forEach(track=>track.stop());return;}
+ stream=acquired;video.srcObject=stream;
+ stream.getVideoTracks().forEach(track=>track.onended=()=>{if(token===generation){stop('摄像头已断开，请重新开启');showStep('设备断开');}});
+ showStep('视频启动');status.textContent='权限已获得，正在启动视频';
+ try{await video.play();}catch(error){if(token===generation)failure('视频启动',error);return;}
+ if(token!==generation)return;
+ showStep('模型加载');status.textContent='视频已启动，正在加载手部模型';
+ try{await ensureModel();}catch(error){if(token===generation)failure('模型加载',error);return;}
+ if(token!==generation)return;
+ canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+ clear();showStep('追踪运行');status.textContent='正在寻找手';loop(token);
 };
-stopButton.onclick=()=>stop();
+stopButton.onclick=()=>{stop(permissionPending?'已取消，等待浏览器结束权限请求':'未开启');showStep('用户关闭');};
 window.addEventListener('pagehide',()=>stop());
 window.addEventListener('handtracking',({detail})=>{
   if(!detail.left.visible) document.querySelector('#left-status').textContent='你的左手：未发现';

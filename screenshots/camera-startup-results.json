@@ -1,0 +1,159 @@
+{
+  "kind": "desktop Chrome, synthetic video stream and model; not real phone",
+  "results": [
+    {
+      "scenario": "success",
+      "calls": [
+        "permission",
+        "play",
+        "model",
+        "permission",
+        "play"
+      ],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：true\n步骤：用户关闭\nerror.name：无\n",
+      "ended": true,
+      "count": 1,
+      "video": "workspace",
+      "constraints": {
+        "video": {
+          "facingMode": {
+            "ideal": "user"
+          },
+          "width": {
+            "ideal": 640
+          },
+          "height": {
+            "ideal": 480
+          }
+        },
+        "audio": false
+      }
+    },
+    {
+      "scenario": "denied",
+      "calls": [
+        "permission"
+      ],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：true\n步骤：申请权限失败\nerror.name：NotAllowedError\n可能已拒绝权限或被系统/页面策略限制。请在网址旁的站点设置允许摄像头，并检查系统中该浏览器的摄像头权限，再点击重试；网页不能强制重新弹出授权框。",
+      "ended": true,
+      "count": 1,
+      "video": "workspace",
+      "constraints": {
+        "video": {
+          "facingMode": {
+            "ideal": "user"
+          },
+          "width": {
+            "ideal": 640
+          },
+          "height": {
+            "ideal": 480
+          }
+        },
+        "audio": false
+      },
+      "retry": "passed"
+    },
+    {
+      "scenario": "play-fail",
+      "calls": [
+        "permission",
+        "play"
+      ],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：true\n步骤：视频启动失败\nerror.name：NotAllowedError\n视频播放失败，请重新点击开启；也请检查浏览器的视频播放限制。",
+      "ended": true,
+      "count": 1,
+      "video": "workspace",
+      "constraints": {
+        "video": {
+          "facingMode": {
+            "ideal": "user"
+          },
+          "width": {
+            "ideal": 640
+          },
+          "height": {
+            "ideal": 480
+          }
+        },
+        "audio": false
+      },
+      "retry": "passed"
+    },
+    {
+      "scenario": "model-fail",
+      "calls": [
+        "permission",
+        "play",
+        "model"
+      ],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：true\n步骤：模型加载失败\nerror.name：Error\n视频已获得权限，但手部模型加载失败；请检查网络后重试。",
+      "ended": true,
+      "count": 1,
+      "video": "workspace",
+      "constraints": {
+        "video": {
+          "facingMode": {
+            "ideal": "user"
+          },
+          "width": {
+            "ideal": 640
+          },
+          "height": {
+            "ideal": 480
+          }
+        },
+        "audio": false
+      },
+      "retry": "passed"
+    },
+    {
+      "scenario": "cancel",
+      "calls": [
+        "permission"
+      ],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：true\n步骤：用户关闭\nerror.name：无\n",
+      "ended": true,
+      "count": 1,
+      "video": "workspace",
+      "constraints": {
+        "video": {
+          "facingMode": {
+            "ideal": "user"
+          },
+          "width": {
+            "ideal": 640
+          },
+          "height": {
+            "ideal": 480
+          }
+        },
+        "audio": false
+      }
+    },
+    {
+      "scenario": "insecure",
+      "calls": [],
+      "info": "地址：http://camera.test/（省略查询参数和片段）\n安全上下文：false\nmediaDevices：false · getUserMedia：false\n嵌入页面：false · 策略允许camera：true\n步骤：环境检查失败\nerror.name：SecurityError\nHTTP局域网IP不能申请手机摄像头。请使用 https://ff7kl.github.io/shoushijiaohu/",
+      "ended": true,
+      "count": 1,
+      "video": "workspace"
+    },
+    {
+      "scenario": "embedded-missing",
+      "calls": [],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：false · getUserMedia：false\n嵌入页面：false · 策略允许camera：true\n步骤：申请权限失败\nerror.name：NotSupportedError\n此浏览器未能启动摄像头，请检查权限后重试。 请从右上角菜单选择“使用系统浏览器打开”。",
+      "ended": true,
+      "count": 1,
+      "video": "workspace"
+    },
+    {
+      "scenario": "policy",
+      "calls": [],
+      "info": "地址：https://camera.test/（省略查询参数和片段）\n安全上下文：true\nmediaDevices：true · getUserMedia：true\n嵌入页面：false · 策略允许camera：false\n步骤：申请权限失败\nerror.name：SecurityError\n浏览器或页面策略禁止摄像头，请检查站点权限或直接打开正式HTTPS网址。",
+      "ended": true,
+      "count": 1,
+      "video": "workspace"
+    }
+  ]
+}
